@@ -705,8 +705,9 @@ def calculate_payroll(
 # ==========================================
 # PASEK BOCZNY
 # ==========================================
-st.sidebar.title("⚙️ Nawigacja")
-st.sidebar.header("Okres Rozliczeniowy")
+st.sidebar.title("System Premii 2.7")
+st.sidebar.caption("1. Zaplanuj miesiąc → 2. Rozlicz produkcję → 3. Zatwierdź wyniki")
+st.sidebar.header("1. Planowanie miesiąca")
 months_list = [
     "Styczeń",
     "Luty",
@@ -735,7 +736,7 @@ if st.sidebar.button("🚀 Wygeneruj Harmonogram", type="primary"):
   st.sidebar.success(f"Wygenerowano na {period_key}!")
 
 st.sidebar.markdown("---")
-st.sidebar.header("📁 Plik Produkcji")
+st.sidebar.header("2. Dane do rozliczenia")
 uploaded_month_file = st.sidebar.file_uploader(
     "Wgraj raport produkcji (Excel):", type=["xlsx", "xls"]
 )
@@ -759,15 +760,37 @@ if st.session_state.current_schedule_df.empty:
   )
 
 # ==========================================
+# PANEL PROCESU - planowanie jest dostępne przed rozpoczęciem miesiąca.
+# ==========================================
+st.subheader("Przebieg pracy")
+st.caption(f"Wybrany okres: {period_key}. Harmonogram można przygotować z wyprzedzeniem, bez plików produkcyjnych.")
+_step_plan = not st.session_state.current_schedule_df.empty
+_step_production = uploaded_month_file is not None
+_step_weights = uploaded_weights_file is not None
+_step_labels = [
+    ("Planowanie i harmonogram", _step_plan),
+    ("Raport produkcji", _step_production),
+    ("Katalog wag", _step_weights),
+]
+_step_cols = st.columns(3)
+for _col, (_label, _ready) in zip(_step_cols, _step_labels):
+  _col.metric(_label, "Dostępne" if _ready else "Do uzupełnienia")
+if not _step_production:
+  st.info("Możesz przygotować harmonogram przed rozpoczęciem miesiąca. Do rozliczenia produkcji wrócisz po otrzymaniu raportu.")
+elif not _step_weights:
+  st.warning("Raport jest wgrany, ale do naliczenia premii potrzebny jest jeszcze katalog wag.")
+st.caption("Kolejność: Harmonogram → Import produkcji → Kontrola wag i analiza dzienna → Premie i paski → Archiwum. Ustawienia są zawsze dostępne.")
+
+# ==========================================
 # ZAKŁADKI
 # ==========================================
 tab_gen, tab_calc, tab_dash, tab_history, tab_comp, tab_settings = st.tabs([
-    "📋 Harmonogram i Skaner",
-    "🧮 Kalkulator Premii",
-    "📊 Dashboard i Wykresy",
-    "📁 Archiwum Historyczne",
-    "📈 Porównanie Wyników",
-    "⚙️ Ustawienia Systemu",
+    "1. Planowanie i Obecności",
+    "2. Rozliczenie i Paski",
+    "3. Analizy",
+    "4. Archiwum",
+    "5. Porównania",
+    "⚙️ Ustawienia",
 ])
 
 # ==========================================
