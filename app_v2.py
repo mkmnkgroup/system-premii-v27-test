@@ -1663,18 +1663,16 @@ def _render_calculator_tab():
     st.markdown("---")
     st.subheader("🧾 7. Imienne Paski Premiowe do Wydruku")
 
+    st.caption("Wybierz pracownika, aby wyświetlić wyłącznie jego pasek premiowy.")
     col_print_sel, _ = st.columns([3, 1])
     with col_print_sel:
       selected_slip_emp = st.selectbox(
-          "Wybierz pracownika do wygenerowania paska (lub wszystkich):",
-          ["WSZYSCY PRACOWNICY"] + unique_emps,
+          "Pracownik",
+          options=[""] + sorted(unique_emps),
+          format_func=lambda name: "— Wybierz pracownika —" if not name else name,
+          key="selected_bonus_slip_employee",
       )
-
-    emps_to_render = (
-        unique_emps
-        if selected_slip_emp == "WSZYSCY PRACOWNICY"
-        else [selected_slip_emp]
-    )
+    emps_to_render = [selected_slip_emp] if selected_slip_emp else []
 
     for e_name in emps_to_render:
       e_det = emp_details_map.get(e_name)
