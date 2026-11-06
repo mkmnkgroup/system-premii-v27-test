@@ -34,6 +34,7 @@ class PreviewTests(unittest.TestCase):
         exported = write_employees_excel(roster)
         imported = read_employees_excel(exported)
         pd.testing.assert_frame_equal(imported, roster)
+        next(r for r in app.radio if r.label == "Moduł").set_value("Ustawienia").run()
         settings_button = next(b for b in app.button if b.label == "💾 Zapisz ustawienia w sesji testowej")
         settings_button.click().run()
         self.assertEqual(list(app.exception), [])
@@ -75,10 +76,12 @@ class PreviewTests(unittest.TestCase):
                 type(st.sidebar), "file_uploader", lambda self, label, *a, **kw: upload(label, *a, **kw)):
             app = AppTest.from_file(APP, default_timeout=45).run()
             self.assertEqual(list(app.exception), [])
+            next(r for r in app.radio if r.label == "Moduł").set_value("Produkcja i premie").run()
             metrics = {m.label: m.value for m in app.metric}
             self.assertEqual(metrics["Pozycje"], "1")
             self.assertEqual(metrics["Sztuki"], "10")
             self.assertTrue(any("20.00 kg" in s.value for s in app.success))
+            next(r for r in app.radio if r.label == "Moduł").set_value("Ustawienia").run()
             next(b for b in app.button if b.label == "Zatwierdź import listy pracowników").click().run()
             self.assertEqual(list(app.exception), [])
             self.assertEqual(app.session_state.employees_df["OSOBA"].tolist(), ["TEST IMPORT 99"])
