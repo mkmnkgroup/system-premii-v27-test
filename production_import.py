@@ -6,6 +6,7 @@ from client_categories import CLIENT_CATEGORY_COLUMN, exclude_categories
 BRAND = "Наименование ТМ запчасти"
 ARTICLE = "Каталожный номер отформатированный"
 QTY = "Количество штук в строке заказа"
+DATE = "Дата перехода в искомое состояние"
 
 
 def normalize(value):
@@ -15,7 +16,7 @@ def normalize(value):
 def read_production(file_bytes):
     """Read only required fields, supporting metadata rows in supplier exports."""
     from openpyxl import load_workbook
-    columns = (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY)
+    columns = (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE)
     book = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
     try:
         sheet = book.active
