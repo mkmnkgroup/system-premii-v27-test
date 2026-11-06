@@ -47,28 +47,28 @@ def apply_theme(mode):
             color: var(--premium-muted) !important;
         }}
         .block-container {{
-            max-width: 1480px;
-            padding-top: 2rem;
-            padding-bottom: 4rem;
+            max-width: 1320px;
+            padding-top: 1rem;
+            padding-bottom: 2rem;
         }}
         .premium-hero {{
-            padding: 24px 28px;
-            margin: 4px 0 22px;
+            padding: 14px 20px;
+            margin: 2px 0 12px;
             border: 1px solid var(--premium-border);
-            border-radius: 20px;
+            border-radius: 13px;
             background: linear-gradient(115deg, var(--premium-surface), var(--premium-raised));
             box-shadow: var(--premium-shadow);
         }}
         .premium-eyebrow {{
-            font-size: .74rem;
+            font-size: .65rem;
             text-transform: uppercase;
             letter-spacing: .16em;
             color: var(--premium-accent);
             font-weight: 750;
         }}
         .premium-hero h1 {{
-            font-size: clamp(1.6rem, 3vw, 2.45rem);
-            margin: .3rem 0 .4rem;
+            font-size: clamp(1.3rem, 2vw, 1.85rem);
+            margin: .18rem 0 .22rem;
             color: var(--premium-text);
             letter-spacing: -.035em;
         }}
@@ -76,8 +76,8 @@ def apply_theme(mode):
         div[data-testid="stMetric"], div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {{
             background: var(--premium-surface);
             border: 1px solid var(--premium-border);
-            border-radius: 16px;
-            padding: 12px 16px;
+            border-radius: 11px;
+            padding: 8px 12px;
             box-shadow: var(--premium-shadow);
         }}
         div[data-testid="stMetricValue"] {{
@@ -86,6 +86,17 @@ def apply_theme(mode):
             letter-spacing: -.025em;
         }}
         div[data-testid="stMetricLabel"] {{color: var(--premium-muted);}}
+        /* Compact, restrained visual hierarchy without shrinking interactive targets excessively. */
+        .stApp h1 {{font-size: 1.7rem;}}
+        .stApp h2 {{font-size: 1.32rem; margin-bottom: .45rem;}}
+        .stApp h3 {{font-size: 1.08rem; margin-bottom: .35rem;}}
+        .stApp [data-testid="stMetricValue"] {{font-size: 1.45rem; line-height: 1.25;}}
+        .stApp [data-testid="stMetricLabel"] {{font-size: .79rem;}}
+        .stApp [data-testid="stVerticalBlock"] {{gap: .65rem;}}
+        .stApp [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{gap: .45rem;}}
+        .stApp [data-testid="stSidebar"] h2 {{font-size: 1.1rem;}}
+        .stApp [data-testid="stSidebar"] h3 {{font-size: .95rem;}}
+        .premium-hero p {{font-size: .84rem;}}
         .stApp div[data-baseweb="tab-list"] {{
             gap: 5px;
             overflow-x: auto;
@@ -96,7 +107,7 @@ def apply_theme(mode):
             background: var(--premium-surface);
             border: 1px solid var(--premium-border);
             color: var(--premium-muted);
-            padding: 10px 15px;
+            padding: 6px 10px;
             white-space: nowrap;
         }}
         .stApp button[data-baseweb="tab"][aria-selected="true"] {{
