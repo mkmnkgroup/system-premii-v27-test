@@ -227,7 +227,7 @@ from production_import import read_production, read_weights, prepare_production
 from weight_research import product_search_url, validate_weight
 
 @st.cache_data(show_spinner="Odczytywanie raportu produkcji...", max_entries=3)
-def cached_read_production(file_bytes):
+def cached_read_production_v2(file_bytes):
   return read_production(file_bytes)
 
 @st.cache_data(show_spinner="Odczytywanie bazy wag...", max_entries=3)
@@ -744,7 +744,7 @@ uploaded_month_file = st.sidebar.file_uploader(
 client_categories_in_file = []
 if uploaded_month_file is not None:
   try:
-    _production_preview = cached_read_production(uploaded_month_file.getvalue())
+    _production_preview = cached_read_production_v2(uploaded_month_file.getvalue())
     client_categories_in_file = category_options(_production_preview)
   except (ValueError, OSError, ImportError) as exc:
     st.sidebar.warning("Nie mozna odczytac kategorii klientow z pliku.")
@@ -1099,7 +1099,7 @@ def _render_calculator_tab():
     prod_df = pd.DataFrame()
     if uploaded_month_file is not None:
       try:
-        prod_df = cached_read_production(uploaded_month_file.getvalue())
+        prod_df = cached_read_production_v2(uploaded_month_file.getvalue())
         if uploaded_weights_file is None:
           st.warning("Wgraj aktualną bazę wag, aby obliczyć premię z raportu produkcji.")
           return
@@ -1284,6 +1284,9 @@ def _render_calculator_tab():
     _daily_weights["_article"] = _daily_weights["Artykuł"].map(_normalize)
     _daily_weights["_weight"] = pd.to_numeric(_daily_weights["Waga"].astype(str).str.replace(",", ".", regex=False), errors="coerce")
     daily_source = daily_source.merge(_daily_weights[["_brand", "_article", "_weight"]], on=["_brand", "_article"], how="left", validate="many_to_one")
+    if _DATE not in daily_source.columns:
+      st.error("W zaimportowanych danych nie ma kolumny daty przejścia. Wgraj raport ponownie; jeśli problem pozostanie, sprawdź nagłówek: " + _DATE)
+      return
     daily_source["_date"] = pd.to_datetime(daily_source[_DATE], dayfirst=True, errors="coerce")
     _invalid_dates = int(daily_source["_date"].isna().sum())
     _outside = int((daily_source["_date"].notna() & ((daily_source["_date"].dt.year != gen_year) | (daily_source["_date"].dt.month != gen_month_idx))).sum())
