@@ -729,11 +729,7 @@ gen_month_idx = months_list.index(gen_month_name) + 1
 gen_year = st.sidebar.number_input("Rok:", value=datetime.now().year, step=1)
 period_key = f"{gen_month_name} {gen_year}"
 
-if st.sidebar.button("🚀 Wygeneruj Harmonogram", type="primary"):
-  st.session_state.current_schedule_df = generate_schedule(
-      gen_year, gen_month_idx
-  )
-  st.sidebar.success(f"Wygenerowano na {period_key}!")
+st.sidebar.caption("Harmonogram utworzysz lub zmienisz w module Harmonogram.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**PLIKI DO ROZLICZENIA**")
