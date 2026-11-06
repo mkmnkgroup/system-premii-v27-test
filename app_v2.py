@@ -1117,10 +1117,11 @@ def _render_calculator_tab():
           _catalog = _pd.concat([_catalog, _pd.DataFrame(_new_rows)], ignore_index=True)
         kpis = prepare_production(prod_df, _catalog, st.session_state.excluded_client_categories)
         st.subheader("Kontrola danych produkcyjnych")
-        k1, k2, k3 = st.columns(3)
+        k1, k2, k3, k4 = st.columns(4)
         k1.metric("Pozycje", f"{kpis['positions']:,}".replace(",", " "))
         k2.metric("Sztuki", f"{kpis['pieces']:,.0f}".replace(",", " ") if kpis["pieces"] is not None else "Błąd danych")
-        k3.metric("Dopasowane wagi", f"{kpis['matched_positions']}/{kpis['positions']}")
+        k3.metric("Łączna waga (kg)", f"{kpis['weight_kg']:,.2f}".replace(",", " ") if kpis["weight_kg"] is not None else "Niekompletna")
+        k4.metric("Dopasowane wagi", f"{kpis['matched_positions']}/{kpis['positions']}")
         st.caption(f"Wykluczono {kpis['excluded_positions']} pozycji według kategorii klienta.")
         if kpis["missing_positions"]:
           st.error(f"Brakuje poprawnych wag lub ilości dla {kpis['missing_positions']} pozycji. "
@@ -1272,8 +1273,29 @@ def _render_calculator_tab():
         "📅 2. Dzienna Analiza Przyjęć i Rozkład Pracy (% Miesiąca)"
     )
 
-    daily_source = exclude_categories(prod_df, st.session_state.excluded_client_categories)[0] if not prod_df.empty else prod_df
-    daily_map = parse_daily_production_cached(daily_source, gen_year, gen_month_idx)
+    # Calculate daily production from the same eligible rows and unit weights as monthly totals.
+    from production_import import DATE as _DATE, BRAND as _BRAND, ARTICLE as _ARTICLE, QTY as _QTY
+    daily_source = exclude_categories(prod_df, st.session_state.excluded_client_categories)[0].copy()
+    daily_source["_brand"] = daily_source[_BRAND].map(_normalize)
+    daily_source["_article"] = daily_source[_ARTICLE].map(_normalize)
+    daily_source["_qty"] = pd.to_numeric(daily_source[_QTY].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+    _daily_weights = _catalog.copy()
+    _daily_weights["_brand"] = _daily_weights["Producent"].map(_normalize)
+    _daily_weights["_article"] = _daily_weights["Artykuł"].map(_normalize)
+    _daily_weights["_weight"] = pd.to_numeric(_daily_weights["Waga"].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+    daily_source = daily_source.merge(_daily_weights[["_brand", "_article", "_weight"]], on=["_brand", "_article"], how="left", validate="many_to_one")
+    daily_source["_date"] = pd.to_datetime(daily_source[_DATE], dayfirst=True, errors="coerce")
+    _invalid_dates = int(daily_source["_date"].isna().sum())
+    _outside = int((daily_source["_date"].notna() & ((daily_source["_date"].dt.year != gen_year) | (daily_source["_date"].dt.month != gen_month_idx))).sum())
+    if _invalid_dates or _outside:
+      st.error(f"Nie można obliczyć analizy dziennej: niepoprawna data w {_invalid_dates} pozycjach; poza wybranym miesiącem: {_outside}.")
+      return
+    daily_map = {day: {"pcs": 0.0, "lines": 0.0, "weight": 0.0} for day in range(1, calendar.monthrange(gen_year, gen_month_idx)[1] + 1)}
+    for _day, _group in daily_source.groupby(daily_source["_date"].dt.day):
+      daily_map[int(_day)] = {"pcs": float(_group["_qty"].sum()), "lines": float(len(_group)), "weight": float((_group["_qty"] * _group["_weight"]).sum())}
+    if abs(sum(v["weight"] for v in daily_map.values()) - cur_weight) > 0.01:
+      st.error("Niezgodność sumy wag dziennych i miesięcznych. Sprawdź dane źródłowe.")
+      return
     days_in_month = calendar.monthrange(gen_year, gen_month_idx)[1]
 
     daily_rows = []
