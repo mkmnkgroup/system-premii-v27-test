@@ -23,7 +23,7 @@ from premium_theme import apply_theme, hero
 from employee_excel import read_employees_excel, write_employees_excel
 
 if "premium_ui_mode" not in st.session_state:
-  st.session_state.premium_ui_mode = "Ciemny"
+  st.session_state.premium_ui_mode = "Jasny"
 
 with st.sidebar:
   st.segmented_control(
