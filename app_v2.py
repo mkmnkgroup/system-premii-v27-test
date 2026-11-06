@@ -754,17 +754,20 @@ uploaded_weights_file = st.sidebar.file_uploader(
     "Aktualna baza wag (Excel .xlsx):", type=["xlsx"], key="current_weights_file"
 )
 
-if st.session_state.current_schedule_df.empty:
-  st.session_state.current_schedule_df = generate_schedule(
-      gen_year, gen_month_idx
-  )
+# A schedule belongs to one month; never silently reuse it for another period.
+if "schedule_period_key" not in st.session_state:
+  st.session_state.schedule_period_key = period_key if not st.session_state.current_schedule_df.empty else None
+_schedule_matches_period = (
+    not st.session_state.current_schedule_df.empty
+    and st.session_state.schedule_period_key == period_key
+)
 
 # ==========================================
 # PANEL PROCESU - planowanie jest dostępne przed rozpoczęciem miesiąca.
 # ==========================================
 st.subheader("Przebieg pracy")
 st.caption(f"Wybrany okres: {period_key}. Harmonogram można przygotować z wyprzedzeniem, bez plików produkcyjnych.")
-_step_plan = not st.session_state.current_schedule_df.empty
+_step_plan = _schedule_matches_period
 _step_production = uploaded_month_file is not None
 _step_weights = uploaded_weights_file is not None
 _step_labels = [
@@ -775,6 +778,8 @@ _step_labels = [
 _step_cols = st.columns(3)
 for _col, (_label, _ready) in zip(_step_cols, _step_labels):
   _col.metric(_label, "Dostępne" if _ready else "Do uzupełnienia")
+if not _step_plan:
+  st.warning("Brak harmonogramu przypisanego do wybranego miesiąca. Przygotuj go w pierwszej zakładce przed rozliczeniem.")
 if not _step_production:
   st.info("Możesz przygotować harmonogram przed rozpoczęciem miesiąca. Do rozliczenia produkcji wrócisz po otrzymaniu raportu.")
 elif not _step_weights:
@@ -799,12 +804,19 @@ tab_gen, tab_calc, tab_dash, tab_history, tab_comp, tab_settings = st.tabs([
 with tab_gen:
   st.header("📋 Harmonogram Czasu Pracy i Rejestracja Obecności")
 
+  if not _schedule_matches_period:
+    st.info("Dla wybranego miesiąca nie ma jeszcze aktywnego harmonogramu. Możesz wygenerować nowy lub wgrać wcześniej zapisany.")
   col_action1, col_action2, _ = st.columns([1.5, 1.5, 2])
   with col_action1:
-    if st.button("🔄 Wygeneruj ponownie Harmonogram"):
+    _confirm_replace = st.checkbox(
+        "Potwierdzam zastąpienie obecnego harmonogramu",
+        key="confirm_schedule_replace",
+    ) if _schedule_matches_period else True
+    if st.button("📅 Wygeneruj harmonogram", disabled=not _confirm_replace):
       st.session_state.current_schedule_df = generate_schedule(
           gen_year, gen_month_idx
       )
+      st.session_state.schedule_period_key = period_key
       st.success("Wygenerowano harmonogram!")
       st.rerun()
 
@@ -820,6 +832,7 @@ with tab_gen:
             uploaded_schedule_excel.getvalue(), uploaded_schedule_excel.name
         )
         st.session_state.current_schedule_df = loaded_df
+        st.session_state.schedule_period_key = period_key
         st.success("Wczytano harmonogram z pliku!")
       except Exception as e:
         st.error(f"Błąd odczytu pliku: {e}")
@@ -1105,10 +1118,8 @@ with tab_gen:
 def _render_calculator_tab():
   st.header("🧮 Rozliczenie Premiowe i Wynagrodzeń Dodatkowych")
 
-  if st.session_state.current_schedule_df.empty:
-    st.warning(
-        "Najpierw wygeneruj lub wgraj harmonogram w pierwszej zakładce!"
-    )
+  if st.session_state.current_schedule_df.empty or st.session_state.schedule_period_key != period_key:
+    st.warning("Najpierw przygotuj harmonogram dla wybranego miesiąca w pierwszej zakładce.")
   else:
     base_salary = st.session_state.base_bonus_salary
     step_bonus_pct = 0.04
