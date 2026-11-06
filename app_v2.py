@@ -762,6 +762,11 @@ _schedule_matches_period = (
     and st.session_state.schedule_period_key == period_key
 )
 
+# Initialize the first selected period once, without overwriting an existing plan.
+if st.session_state.current_schedule_df.empty and st.session_state.schedule_period_key is None:
+  st.session_state.current_schedule_df = generate_schedule(gen_year, gen_month_idx)
+  st.session_state.schedule_period_key = period_key
+
 # ==========================================
 # PANEL PROCESU - planowanie jest dostępne przed rozpoczęciem miesiąca.
 # ==========================================
