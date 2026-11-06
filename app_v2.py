@@ -705,9 +705,9 @@ def calculate_payroll(
 # ==========================================
 # PASEK BOCZNY
 # ==========================================
-st.sidebar.title("System Premii 2.7")
-st.sidebar.caption("1. Zaplanuj miesiąc → 2. Rozlicz produkcję → 3. Zatwierdź wyniki")
-st.sidebar.header("1. Planowanie miesiąca")
+st.sidebar.markdown("#### ◈ System Premii 2.7")
+st.sidebar.caption("CENTRUM OPERACYJNE · WERSJA TESTOWA")
+st.sidebar.markdown("**OKRES PRACY**")
 months_list = [
     "Styczeń",
     "Luty",
@@ -736,7 +736,7 @@ if st.sidebar.button("🚀 Wygeneruj Harmonogram", type="primary"):
   st.sidebar.success(f"Wygenerowano na {period_key}!")
 
 st.sidebar.markdown("---")
-st.sidebar.header("2. Dane do rozliczenia")
+st.sidebar.markdown("**PLIKI DO ROZLICZENIA**")
 uploaded_month_file = st.sidebar.file_uploader(
     "Wgraj raport produkcji (Excel):", type=["xlsx", "xls"]
 )
@@ -754,42 +754,51 @@ uploaded_weights_file = st.sidebar.file_uploader(
     "Aktualna baza wag (Excel .xlsx):", type=["xlsx"], key="current_weights_file"
 )
 
-# A schedule belongs to one month; never silently reuse it for another period.
+# Initialize the first period before computing its readiness.
 if "schedule_period_key" not in st.session_state:
   st.session_state.schedule_period_key = period_key if not st.session_state.current_schedule_df.empty else None
+if st.session_state.current_schedule_df.empty and st.session_state.schedule_period_key is None:
+  st.session_state.current_schedule_df = generate_schedule(gen_year, gen_month_idx)
+  st.session_state.schedule_period_key = period_key
 _schedule_matches_period = (
     not st.session_state.current_schedule_df.empty
     and st.session_state.schedule_period_key == period_key
 )
 
-# Initialize the first selected period once, without overwriting an existing plan.
-if st.session_state.current_schedule_df.empty and st.session_state.schedule_period_key is None:
-  st.session_state.current_schedule_df = generate_schedule(gen_year, gen_month_idx)
-  st.session_state.schedule_period_key = period_key
-
 # ==========================================
 # PANEL PROCESU - planowanie jest dostępne przed rozpoczęciem miesiąca.
 # ==========================================
-st.subheader("Przebieg pracy")
-st.caption(f"Wybrany okres: {period_key}. Harmonogram można przygotować z wyprzedzeniem, bez plików produkcyjnych.")
+# Power Apps-inspired command bar and compact record header.
+st.markdown(
+    '<div class="work-commandbar">'
+    '<span class="work-commandbar-brand">SYSTEM PREMII / OBSZAR ROBOCZY</span>'
+    '<span>Planowanie</span><span class="work-commandbar-arrow">›</span>'
+    '<span>Rozliczenie</span><span class="work-commandbar-arrow">›</span>'
+    '<span>Weryfikacja</span><span class="work-commandbar-arrow">›</span>'
+    '<span>Archiwum</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(f'<div class="work-record-header"><div><div class="work-record-kicker">OKRES ROBOCZY · WERSJA TESTOWA</div>'
+            f'<h2>{period_key}</h2><p>Harmonogram możesz przygotować przed rozpoczęciem miesiąca. '
+            f'Rozliczenie uzupełnisz po otrzymaniu raportu produkcji.</p></div>'
+            f'<span class="work-record-state">● Bieżący okres</span></div>',
+            unsafe_allow_html=True)
 _step_plan = _schedule_matches_period
 _step_production = uploaded_month_file is not None
 _step_weights = uploaded_weights_file is not None
-_step_labels = [
-    ("Planowanie i harmonogram", _step_plan),
-    ("Raport produkcji", _step_production),
-    ("Katalog wag", _step_weights),
-]
+st.markdown('<div class="work-section-heading">POSTĘP PRACY</div>', unsafe_allow_html=True)
 _step_cols = st.columns(3)
-for _col, (_label, _ready) in zip(_step_cols, _step_labels):
-  _col.metric(_label, "Dostępne" if _ready else "Do uzupełnienia")
+for _col, _label, _ready in zip(_step_cols,
+    ("01 · Harmonogram", "02 · Raport produkcji", "03 · Katalog wag"),
+    (_step_plan, _step_production, _step_weights)):
+  _col.metric(_label, "Gotowe" if _ready else "Do uzupełnienia")
 if not _step_plan:
-  st.warning("Brak harmonogramu przypisanego do wybranego miesiąca. Przygotuj go w pierwszej zakładce przed rozliczeniem.")
+  st.warning("Brak harmonogramu dla wybranego miesiąca. Przygotuj go w zakładce Planowanie.")
 if not _step_production:
-  st.info("Możesz przygotować harmonogram przed rozpoczęciem miesiąca. Do rozliczenia produkcji wrócisz po otrzymaniu raportu.")
+  st.info("Etap planowania jest dostępny bez raportu produkcji. Rozliczenie wykonasz później.")
 elif not _step_weights:
-  st.warning("Raport jest wgrany, ale do naliczenia premii potrzebny jest jeszcze katalog wag.")
-st.caption("Kolejność: Harmonogram → Import produkcji → Kontrola wag i analiza dzienna → Premie i paski → Archiwum. Ustawienia są zawsze dostępne.")
+  st.warning("Do rozliczenia produkcji potrzebny jest jeszcze katalog wag.")
 
 # ==========================================
 # ZAKŁADKI
@@ -807,7 +816,8 @@ tab_gen, tab_calc, tab_dash, tab_history, tab_comp, tab_settings = st.tabs([
 # ZAKŁADKA 1: HARMONOGRAM I SKANER
 # ==========================================
 with tab_gen:
-  st.header("📋 Harmonogram Czasu Pracy i Rejestracja Obecności")
+  st.markdown("#### Harmonogram i rejestracja obecności")
+  st.caption("PLANOWANIE MIESIĄCA / Harmonogram · Obecności · Nieobecności")
 
   if not _schedule_matches_period:
     st.info("Dla wybranego miesiąca nie ma jeszcze aktywnego harmonogramu. Możesz wygenerować nowy lub wgrać wcześniej zapisany.")
