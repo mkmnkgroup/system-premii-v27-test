@@ -9,7 +9,7 @@ from streamlit.testing.v1 import AppTest
 
 from preview_storage import load_item, save_item
 from employee_excel import read_employees_excel, write_employees_excel
-from production_import import BRAND, ARTICLE, QTY
+from production_import import BRAND, ARTICLE, QTY, DATE
 from client_categories import CLIENT_CATEGORY_COLUMN
 
 APP = str(Path(__file__).resolve().parents[1] / "app_v2.py")
@@ -34,12 +34,12 @@ class PreviewTests(unittest.TestCase):
         exported = write_employees_excel(roster)
         imported = read_employees_excel(exported)
         pd.testing.assert_frame_equal(imported, roster)
-        for label in ("💾 Zapisz ustawienia w sesji testowej",
-                      "💾 Zapisz rozliczenie w archiwum sesji testowej"):
-            next(b for b in app.button if b.label == label).click().run()
-            self.assertEqual(list(app.exception), [])
+        settings_button = next(b for b in app.button if b.label == "💾 Zapisz ustawienia w sesji testowej")
+        settings_button.click().run()
+        self.assertEqual(list(app.exception), [])
         self.assertIn("settings_v27", app.session_state["_preview_store"])
-        self.assertIn("archive_v27", app.session_state["_preview_store"])
+        # Archive is deliberately unavailable until production is validated and calculated.
+        self.assertNotIn("archive_v27", app.session_state["_preview_store"])
         self.assertFalse(AppTest.from_file(APP, default_timeout=45).run().session_state.history_v2)
 
     def test_uploaded_production_exclusions_and_excel_import(self):
@@ -52,6 +52,7 @@ class PreviewTests(unittest.TestCase):
         production = excel(pd.DataFrame({
             CLIENT_CATEGORY_COLUMN: ["EXP_EU", "test", "UA-2", "АНД", "ОПТ_UA", "ФОП_UA"],
             BRAND: ["DEMO"] * 6, ARTICLE: ["A1"] * 6, QTY: [10, 999, 999, 999, 999, 999],
+            DATE: ["2026-11-05"] * 6,
         }))
         weights = excel(pd.DataFrame({"Producent": ["DEMO"], "Artykuł": ["A1"], "Waga": [2]}))
         roster = excel(pd.DataFrame([{
