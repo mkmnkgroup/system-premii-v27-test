@@ -1079,7 +1079,7 @@ with tab_gen:
 # ==========================================
 # ZAKŁADKA 2: KALKULATOR PREMII
 # ==========================================
-with tab_calc:
+def _render_calculator_tab():
   st.header("🧮 Rozliczenie Premiowe i Wynagrodzeń Dodatkowych")
 
   if st.session_state.current_schedule_df.empty:
@@ -1102,7 +1102,7 @@ with tab_calc:
         prod_df = cached_read_production(uploaded_month_file.getvalue())
         if uploaded_weights_file is None:
           st.warning("Wgraj aktualną bazę wag, aby obliczyć premię z raportu produkcji.")
-          st.stop()
+          return
         weights_df = cached_read_weights(uploaded_weights_file.getvalue())
         if "approved_weights" not in st.session_state:
           st.session_state.approved_weights = {}
@@ -1137,11 +1137,10 @@ with tab_calc:
                            product_search_url(*_selected))
             with st.form("approve_weight_form"):
               _entered_weight = st.text_input("Zweryfikowana waga jednej sztuki (kg)")
-              _source_url = st.text_input("Źródło wagi (adres URL lub opis)")
+              _source_url = st.text_input("Źródło wagi (opcjonalnie — adres URL lub opis)")
               if st.form_submit_button("Zatwierdź wagę"):
                 try:
-                  if not _source_url.strip():
-                    raise ValueError("Podaj źródło zatwierdzanej wagi.")
+
                   _key = tuple(_normalize(v) for v in _selected)
                   st.session_state.approved_weights[_key] = validate_weight(_entered_weight)
                   st.success("Waga zatwierdzona w bieżącej sesji.")
@@ -1158,12 +1157,12 @@ with tab_calc:
           st.download_button("Pobierz listę brakujących artykułów (CSV)",
                              data=kpis["missing_items"].to_csv(index=False).encode("utf-8-sig"),
                              file_name="brakujace_wagi.csv", mime="text/csv")
-          st.stop()
+          return
         cur_pcs, cur_lines, cur_weight = kpis["pieces"], float(kpis["positions"]), kpis["weight_kg"]
         st.success(f"Łączna waga: {cur_weight:,.2f} kg".replace(",", " "))
       except (ValueError, KeyError, OSError, ImportError) as exc:
         st.error(f"Nie można przygotować danych produkcyjnych: {exc}")
-        st.stop()
+        return
 
     dev_pcs = (
         (cur_pcs - st.session_state.avg_pcs_12m) / st.session_state.avg_pcs_12m
@@ -1537,7 +1536,7 @@ with tab_calc:
             "danych dziennej produkcji. Wczytaj dane z datami i wartościami "
             "dla wybranego miesiąca."
         )
-        st.stop()
+        return
 
     # OBLICZENIA I PODSUMOWANIE ZESPOŁU
     summary_df, emp_details_map = calculate_payroll(
@@ -1733,6 +1732,9 @@ with tab_calc:
             """,
           unsafe_allow_html=True,
       )
+
+with tab_calc:
+  _render_calculator_tab()
 
 # ==========================================
 # ZAKŁADKA 3: DASHBOARD
