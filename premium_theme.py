@@ -11,9 +11,9 @@ PALETTES = {
         "shadow": "0 12px 36px rgba(0,0,0,.20)",
     },
     "Jasny": {
-        "bg": "#f3f6fb", "surface": "#ffffff", "raised": "#eaf1fb",
-        "text": "#16243a", "muted": "#546780", "border": "#dbe4f0",
-        "accent": "#205bb5", "accent_text": "#ffffff", "input": "#ffffff",
+        "bg": "#f3f5f8", "surface": "#ffffff", "raised": "#eef3f8",
+        "text": "#203047", "muted": "#63758b", "border": "#dce4ed",
+        "accent": "#17639a", "accent_text": "#ffffff", "input": "#ffffff",
         "success": "#e5f7ee", "success_text": "#12694a",
         "danger": "#fff0f1", "danger_text": "#a0203b",
         "shadow": "0 10px 28px rgba(28,57,94,.07)",
@@ -50,6 +50,36 @@ def apply_theme(mode):
             max-width: 1320px;
             padding-top: 1rem;
             padding-bottom: 2rem;
+        }}
+        /* Warehouse ERP shell: restrained navy header, compact navigation and work cards. */
+        .premium-hero {{
+            background: linear-gradient(105deg, #1c354e 0%, #274c6b 100%) !important;
+            border: 0 !important; border-radius: 8px !important;
+            box-shadow: none !important; padding: 12px 18px !important;
+            margin-bottom: 12px !important;
+        }}
+        .premium-hero h1 {{color:#fff !important; font-size:1.18rem !important; letter-spacing:.015em;}}
+        .premium-hero p {{color:#d4e4f0 !important; font-size:.74rem !important;}}
+        .premium-eyebrow {{color:#c0d7e8 !important; font-size:.61rem !important;}}
+        .work-commandbar {{background:var(--premium-surface); border-radius:6px;}}
+        .work-record-header {{box-shadow:none;}}
+        .stApp [data-testid="stSidebar"] {{
+            border-right:1px solid var(--premium-border);
+        }}
+        .stApp [data-testid="stSidebar"] h4 {{font-size:.92rem;}}
+        .stApp [data-testid="stMetric"] {{
+            border:1px solid var(--premium-border) !important;
+            background:var(--premium-surface) !important;
+            border-radius:7px !important;
+        }}
+        .stApp [data-testid="stMetricValue"] {{font-size:1.25rem !important;}}
+        .stApp [data-baseweb="tab"] {{font-size:.8rem; padding:8px 10px;}}
+        .erp-dashboard-heading {{
+            font-size:.75rem; font-weight:750; color:var(--premium-muted);
+            letter-spacing:.065em; margin:10px 0 7px;
+        }}
+        .erp-module-note {{
+            font-size:.77rem; color:var(--premium-muted); margin:4px 0 9px;
         }}
         /* Compact business application shell inspired by Fluent forms. */
         .work-commandbar {{
