@@ -51,6 +51,43 @@ def apply_theme(mode):
             padding-top: 1rem;
             padding-bottom: 2rem;
         }}
+        /* Compact business application shell inspired by Fluent forms. */
+        .work-commandbar {{
+            display:flex; align-items:center; gap:13px; flex-wrap:wrap;
+            min-height:42px; padding:8px 15px; margin-bottom:10px;
+            background:var(--premium-surface); border:1px solid var(--premium-border);
+            border-radius:7px; font-size:.79rem; color:var(--premium-muted);
+        }}
+        .work-commandbar-brand {{
+            color:var(--premium-accent); font-weight:750; letter-spacing:.045em;
+            padding-right:15px; border-right:1px solid var(--premium-border);
+        }}
+        .work-commandbar-arrow {{opacity:.45;}}
+        .work-record-header {{
+            display:flex; align-items:center; justify-content:space-between;
+            gap:16px; padding:15px 19px; margin-bottom:13px;
+            background:var(--premium-surface); border:1px solid var(--premium-border);
+            border-radius:8px;
+        }}
+        .work-record-kicker, .work-section-heading {{
+            font-size:.69rem; font-weight:750; letter-spacing:.08em;
+            color:var(--premium-muted); margin-bottom:6px;
+        }}
+        .work-record-header h2 {{margin:0 0 3px; font-size:1.35rem;}}
+        .work-record-header p {{margin:0; color:var(--premium-muted); font-size:.81rem;}}
+        .work-record-state {{
+            color:var(--premium-accent); font-size:.76rem; white-space:nowrap;
+            border:1px solid var(--premium-border); padding:6px 10px; border-radius:20px;
+        }}
+        .work-section-heading {{margin:5px 0 7px;}}
+        .stApp div[data-testid="stMetric"] {{
+            box-shadow:none; border-radius:7px; padding:8px 12px;
+        }}
+        .stApp div[data-baseweb="tab-list"] {{border-bottom:1px solid var(--premium-border);}}
+        @media(max-width:720px) {{
+            .work-record-header {{align-items:flex-start; flex-direction:column;}}
+            .work-commandbar-brand {{width:100%; border-right:0;}}
+        }}
         .premium-hero {{
             padding: 14px 20px;
             margin: 2px 0 12px;
