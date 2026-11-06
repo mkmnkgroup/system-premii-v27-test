@@ -770,6 +770,16 @@ _schedule_matches_period = (
 # ==========================================
 # Power Apps-inspired command bar and compact record header.
 # Compact warehouse operations overview, without fabricated production KPIs.
+st.sidebar.markdown("---")
+st.sidebar.markdown("**NAWIGACJA**")
+selected_module = st.sidebar.radio(
+    "Moduł",
+    ["Pulpit", "Harmonogram", "Produkcja i premie", "Analizy", "Archiwum", "Porównania", "Ustawienia"],
+    label_visibility="collapsed",
+    key="erp_selected_module",
+)
+st.sidebar.caption("Wybierz moduł, aby wyświetlić tylko jego zawartość.")
+
 st.markdown(
     '<div class="work-commandbar">'
     '<span class="work-commandbar-brand">PANEL OPERACYJNY</span>'
@@ -791,54 +801,43 @@ st.markdown(
 _step_plan = _schedule_matches_period
 _step_production = uploaded_month_file is not None
 _step_weights = uploaded_weights_file is not None
-st.markdown('<div class="erp-dashboard-heading">GOTOWOŚĆ DO ROZLICZENIA</div>', unsafe_allow_html=True)
-_overview_cols = st.columns(4)
-_overview_cols[0].metric("01 · Harmonogram", "Gotowy" if _step_plan else "Brak")
-_overview_cols[1].metric("02 · Raport produkcji", "Wgrany" if _step_production else "Brak")
-_overview_cols[2].metric("03 · Katalog wag", "Wgrany" if _step_weights else "Brak")
-_overview_cols[3].metric("Etapy przygotowane", f"{sum((_step_plan, _step_production, _step_weights))} / 3")
-st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
-_work_left, _work_right = st.columns([1.5, 1])
-with _work_left:
-  with st.container(border=True):
-    st.markdown("**Planowanie i harmonogram**")
-    st.caption("Harmonogram można przygotować przed rozpoczęciem miesiąca.")
-    if _step_plan:
-      st.success("Harmonogram przypisany do wybranego okresu.")
-    else:
-      st.warning("Przygotuj harmonogram dla tego miesiąca.")
-    st.markdown("**Rozliczenie produkcji**")
-    if not _step_production:
-      st.info("Oczekiwanie na raport produkcji.")
-    elif not _step_weights:
-      st.warning("Raport wgrany — uzupełnij katalog wag.")
-    else:
-      st.success("Pliki wgrane — sprawdź poprawność danych w kalkulatorze.")
-with _work_right:
-  with st.container(border=True):
-    st.markdown("**Kolejne czynności**")
-    st.checkbox("Harmonogram dla okresu", value=_step_plan, disabled=True, key="overview_schedule")
-    st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
-    st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
-    st.caption("Wgranie plików nie oznacza jeszcze zatwierdzenia obliczeń.")
-st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Dane testowe pozostają w bieżącej sesji.</div>', unsafe_allow_html=True)
-
-# ==========================================
-# ZAKŁADKI
-# ==========================================
-tab_gen, tab_calc, tab_dash, tab_history, tab_comp, tab_settings = st.tabs([
-    "1. Planowanie i Obecności",
-    "2. Rozliczenie i Paski",
-    "3. Analizy",
-    "4. Archiwum",
-    "5. Porównania",
-    "⚙️ Ustawienia",
-])
+if selected_module == "Pulpit":
+  st.markdown('<div class="erp-dashboard-heading">GOTOWOŚĆ DO ROZLICZENIA</div>', unsafe_allow_html=True)
+  _overview_cols = st.columns(4)
+  _overview_cols[0].metric("01 · Harmonogram", "Gotowy" if _step_plan else "Brak")
+  _overview_cols[1].metric("02 · Raport produkcji", "Wgrany" if _step_production else "Brak")
+  _overview_cols[2].metric("03 · Katalog wag", "Wgrany" if _step_weights else "Brak")
+  _overview_cols[3].metric("Etapy przygotowane", f"{sum((_step_plan, _step_production, _step_weights))} / 3")
+  st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
+  _work_left, _work_right = st.columns([1.5, 1])
+  with _work_left:
+    with st.container(border=True):
+      st.markdown("**Planowanie i harmonogram**")
+      st.caption("Harmonogram można przygotować przed rozpoczęciem miesiąca.")
+      if _step_plan:
+        st.success("Harmonogram przypisany do wybranego okresu.")
+      else:
+        st.warning("Przygotuj harmonogram dla tego miesiąca.")
+      st.markdown("**Rozliczenie produkcji**")
+      if not _step_production:
+        st.info("Oczekiwanie na raport produkcji.")
+      elif not _step_weights:
+        st.warning("Raport wgrany — uzupełnij katalog wag.")
+      else:
+        st.success("Pliki wgrane — sprawdź poprawność danych w kalkulatorze.")
+  with _work_right:
+    with st.container(border=True):
+      st.markdown("**Kolejne czynności**")
+      st.checkbox("Harmonogram dla okresu", value=_step_plan, disabled=True, key="overview_schedule")
+      st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
+      st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
+      st.caption("Wgranie plików nie oznacza jeszcze zatwierdzenia obliczeń.")
+  st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Dane testowe pozostają w bieżącej sesji.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # ZAKŁADKA 1: HARMONOGRAM I SKANER
 # ==========================================
-with tab_gen:
+if selected_module == "Harmonogram":
   st.markdown("#### Harmonogram i rejestracja obecności")
   st.caption("PLANOWANIE MIESIĄCA / Harmonogram · Obecności · Nieobecności")
 
@@ -1831,13 +1830,13 @@ def _render_calculator_tab():
           unsafe_allow_html=True,
       )
 
-with tab_calc:
+if selected_module == "Produkcja i premie":
   _render_calculator_tab()
 
 # ==========================================
 # ZAKŁADKA 3: DASHBOARD
 # ==========================================
-with tab_dash:
+if selected_module == "Analizy":
   st.header("📊 Dashboard Analityczny")
   if period_key in st.session_state.history_v2:
     data_hist = st.session_state.history_v2[period_key]
@@ -1872,7 +1871,7 @@ with tab_dash:
 # ==========================================
 # ZAKŁADKA 4: ARCHIWUM
 # ==========================================
-with tab_history:
+if selected_module == "Archiwum":
   st.header("📁 Archiwum Zapisanych Rozliczeń")
   if st.session_state.history_v2:
     selected_period = st.selectbox(
@@ -1890,7 +1889,7 @@ with tab_history:
 # ==========================================
 # ZAKŁADKA 5: PORÓWNANIE
 # ==========================================
-with tab_comp:
+if selected_module == "Porównania":
   st.header("📈 Porównanie Okresów Historycznych")
   if len(st.session_state.history_v2) >= 2:
     periods = list(st.session_state.history_v2.keys())
@@ -2021,7 +2020,7 @@ with tab_comp:
 # ==========================================
 # ZAKŁADKA 6: USTAWIENIA
 # ==========================================
-with tab_settings:
+if selected_module == "Ustawienia":
   st.header("⚙️ Ustawienia Parametrów i Stałych Systemowych")
 
   col_set1, col_set2 = st.columns(2)
