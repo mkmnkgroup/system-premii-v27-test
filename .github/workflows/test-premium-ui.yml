@@ -1,0 +1,44 @@
+name: Test Dark Premium UI
+
+on:
+  pull_request:
+    paths:
+      - "app_v2.py"
+      - "premium_theme.py"
+      - "tests/test_premium_theme.py"
+      - "tests/test_absence_bonus.py"
+      - "tests/test_employee_excel.py"
+      - "employee_excel.py"
+      - "client_categories.py"
+      - "tests/test_client_categories.py"
+      - "production_import.py"
+      - "tests/test_production_import.py"
+      - ".github/workflows/test-premium-ui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-ui-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install payroll test dependency
+        run: python -m pip install pandas openpyxl
+      - name: Parse app and theme
+        run: python -m py_compile app_v2.py premium_theme.py
+      - name: Run presentation regression checks
+        run: python -m unittest discover -s tests -p 'test_premium_theme.py' -v
+      - name: Run absence bonus regression checks
+        run: python -m unittest discover -s tests -p 'test_absence_bonus.py' -v
+      - name: Run client category exclusion regression checks
+        run: python -m unittest discover -s tests -p 'test_client_categories.py' -v
+      - name: Run production import regression checks
+        run: python -m unittest discover -s tests -p 'test_production_import.py' -v
+      - name: Run employee Excel regression checks
+        run: python -m unittest discover -s tests -p 'test_employee_excel.py' -v
+

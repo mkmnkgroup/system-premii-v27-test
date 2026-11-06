@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+archiwum_premii_v2.pkl
+settings_v2.json
+

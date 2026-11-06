@@ -1,0 +1,12 @@
+streamlit>=1.50,<2
+google-generativeai
+pandas>=2.2,<3
+openpyxl
+xlrd
+Pillow
+plotly
+holidays
+fpdf2
+PyGithub
+psycopg[binary]>=3.2,<4
+
