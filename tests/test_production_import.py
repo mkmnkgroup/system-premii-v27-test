@@ -1,7 +1,7 @@
 import io
 import unittest
 import pandas as pd
-from production_import import prepare_production, read_production, read_weights, BRAND, ARTICLE, QTY
+from production_import import prepare_production, read_production, read_weights, BRAND, ARTICLE, QTY, DATE
 from client_categories import CLIENT_CATEGORY_COLUMN
 
 
@@ -41,8 +41,8 @@ class ProductionImportTests(unittest.TestCase):
         from openpyxl import Workbook
         wb = Workbook(); ws = wb.active
         for i in range(5): ws.append(["metadata"])
-        ws.append([CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY])
-        ws.append(["A", "Bosch", "123", 2])
+        ws.append([CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE])
+        ws.append(["A", "Bosch", "123", 2, "2026-11-05"])
         out = io.BytesIO(); wb.save(out)
         self.assertEqual(len(read_production(out.getvalue())), 1)
 
