@@ -769,36 +769,59 @@ _schedule_matches_period = (
 # PANEL PROCESU - planowanie jest dostępne przed rozpoczęciem miesiąca.
 # ==========================================
 # Power Apps-inspired command bar and compact record header.
+# Compact warehouse operations overview, without fabricated production KPIs.
 st.markdown(
     '<div class="work-commandbar">'
-    '<span class="work-commandbar-brand">SYSTEM PREMII / OBSZAR ROBOCZY</span>'
-    '<span>Planowanie</span><span class="work-commandbar-arrow">›</span>'
-    '<span>Rozliczenie</span><span class="work-commandbar-arrow">›</span>'
-    '<span>Weryfikacja</span><span class="work-commandbar-arrow">›</span>'
-    '<span>Archiwum</span>'
+    '<span class="work-commandbar-brand">PANEL OPERACYJNY</span>'
+    '<span>Harmonogram</span><span class="work-commandbar-arrow">›</span>'
+    '<span>Produkcja</span><span class="work-commandbar-arrow">›</span>'
+    '<span>Premie</span><span class="work-commandbar-arrow">›</span>'
+    '<span>Analizy i archiwum</span>'
     '</div>',
     unsafe_allow_html=True,
 )
-st.markdown(f'<div class="work-record-header"><div><div class="work-record-kicker">OKRES ROBOCZY · WERSJA TESTOWA</div>'
-            f'<h2>{period_key}</h2><p>Harmonogram możesz przygotować przed rozpoczęciem miesiąca. '
-            f'Rozliczenie uzupełnisz po otrzymaniu raportu produkcji.</p></div>'
-            f'<span class="work-record-state">● Bieżący okres</span></div>',
-            unsafe_allow_html=True)
+st.markdown(
+    f'<div class="work-record-header"><div>'
+    f'<div class="work-record-kicker">PODSUMOWANIE OKRESU · WERSJA TESTOWA</div>'
+    f'<h2>{period_key}</h2>'
+    f'<p>Najpierw zaplanuj harmonogram, następnie rozlicz produkcję i premie.</p>'
+    f'</div><span class="work-record-state">● Panel roboczy</span></div>',
+    unsafe_allow_html=True,
+)
 _step_plan = _schedule_matches_period
 _step_production = uploaded_month_file is not None
 _step_weights = uploaded_weights_file is not None
-st.markdown('<div class="work-section-heading">POSTĘP PRACY</div>', unsafe_allow_html=True)
-_step_cols = st.columns(3)
-for _col, _label, _ready in zip(_step_cols,
-    ("01 · Harmonogram", "02 · Raport produkcji", "03 · Katalog wag"),
-    (_step_plan, _step_production, _step_weights)):
-  _col.metric(_label, "Gotowe" if _ready else "Do uzupełnienia")
-if not _step_plan:
-  st.warning("Brak harmonogramu dla wybranego miesiąca. Przygotuj go w zakładce Planowanie.")
-if not _step_production:
-  st.info("Etap planowania jest dostępny bez raportu produkcji. Rozliczenie wykonasz później.")
-elif not _step_weights:
-  st.warning("Do rozliczenia produkcji potrzebny jest jeszcze katalog wag.")
+st.markdown('<div class="erp-dashboard-heading">GOTOWOŚĆ DO ROZLICZENIA</div>', unsafe_allow_html=True)
+_overview_cols = st.columns(4)
+_overview_cols[0].metric("01 · Harmonogram", "Gotowy" if _step_plan else "Brak")
+_overview_cols[1].metric("02 · Raport produkcji", "Wgrany" if _step_production else "Brak")
+_overview_cols[2].metric("03 · Katalog wag", "Wgrany" if _step_weights else "Brak")
+_overview_cols[3].metric("Etapy przygotowane", f"{sum((_step_plan, _step_production, _step_weights))} / 3")
+st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
+_work_left, _work_right = st.columns([1.5, 1])
+with _work_left:
+  with st.container(border=True):
+    st.markdown("**Planowanie i harmonogram**")
+    st.caption("Harmonogram można przygotować przed rozpoczęciem miesiąca.")
+    if _step_plan:
+      st.success("Harmonogram przypisany do wybranego okresu.")
+    else:
+      st.warning("Przygotuj harmonogram dla tego miesiąca.")
+    st.markdown("**Rozliczenie produkcji**")
+    if not _step_production:
+      st.info("Oczekiwanie na raport produkcji.")
+    elif not _step_weights:
+      st.warning("Raport wgrany — uzupełnij katalog wag.")
+    else:
+      st.success("Pliki wgrane — sprawdź poprawność danych w kalkulatorze.")
+with _work_right:
+  with st.container(border=True):
+    st.markdown("**Kolejne czynności**")
+    st.checkbox("Harmonogram dla okresu", value=_step_plan, disabled=True, key="overview_schedule")
+    st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
+    st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
+    st.caption("Wgranie plików nie oznacza jeszcze zatwierdzenia obliczeń.")
+st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Dane testowe pozostają w bieżącej sesji.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # ZAKŁADKI
