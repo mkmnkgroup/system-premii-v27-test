@@ -1120,6 +1120,9 @@ def _render_calculator_tab():
     df_sched = st.session_state.current_schedule_df
     cur_pcs, cur_lines, cur_weight, cur_pallets = 0.0, 0.0, 0.0, 0.0
     prod_df = pd.DataFrame()
+    if uploaded_month_file is None:
+      st.info("Aby rozpocząć rozliczenie, wgraj raport produkcji w panelu bocznym. Harmonogram i ustawienia są dostępne bez raportu.")
+      return
     if uploaded_month_file is not None:
       try:
         prod_df = cached_read_production_v2(uploaded_month_file.getvalue())
