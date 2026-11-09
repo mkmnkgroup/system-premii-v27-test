@@ -162,6 +162,11 @@ def login_gate():
                     clear_user_session(st.session_state)
                     st.rerun()
                 if allowed_module(role, "test_workspace"):
+                    if st.sidebar.button("👥 Administracja · Użytkownicy", key="_test_admin_button"):
+                        st.session_state["_test_admin_panel"] = True
+                    if st.session_state.get("_test_admin_panel"):
+                        from admin_users import render_admin_panel
+                        render_admin_panel()
                     return role
                 _login_header()
                 st.info("Konto aktywne. Panel tej roli jest przygotowywany; dane innych pracowników są niedostępne.")
