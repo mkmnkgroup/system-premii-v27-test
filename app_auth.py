@@ -5,6 +5,7 @@ private production data in the public test deployment.
 """
 import requests
 import streamlit as st
+from auth_rules import active_role
 
 
 def _config():
@@ -42,10 +43,10 @@ def login_gate():
         status, user = _request("GET", "/auth/v1/user", token=token)
         if status == 200 and user.get("id"):
             status, profiles = _request(
-                "GET", "/rest/v1/app_user_profiles?select=role,enabled,employee_id&user_id=eq." + user["id"],
+                "GET", "/rest/v1/app_user_profiles?select=user_id,role,enabled,employee_id&user_id=eq." + user["id"],
                 token=token)
-            if status == 200 and len(profiles) == 1 and profiles[0].get("enabled"):
-                role = profiles[0]["role"]
+            role = active_role(user, profiles) if status == 200 else None
+            if role:
                 st.sidebar.write("Zalogowano:", user.get("email", ""))
                 st.sidebar.write("Rola:", role)
                 if st.sidebar.button("Wyloguj", key="_test_logout"):
