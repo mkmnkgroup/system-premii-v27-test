@@ -113,7 +113,7 @@ class PasswordRecoveryTests(unittest.TestCase):
             app.run()
             request.assert_not_called()
         self.assertEqual(list(app.exception), [])
-        self.assertEqual([f.label for f in app.text_input], ["Link odzyskiwania z wiadomości"])
+        self.assertEqual([f.label for f in app.text_input], ["Link z wiadomości e-mail"])
         self.assertEqual(list(app.radio), [])
 
     def test_invalid_link_cannot_update_password(self):
