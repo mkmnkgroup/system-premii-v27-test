@@ -88,7 +88,7 @@ def _password_recovery():
     if not token:
         st.info("Otwórz najnowszy link zaproszenia lub odzyskiwania hasła z wiadomości e-mail. Jeśli automatyczny powrót nie działa, wklej link poniżej.")
         with st.form("_test_recovery_link_form", clear_on_submit=True):
-            link = st.text_input("Link odzyskiwania z wiadomości", type="password")
+            link = st.text_input("Link z wiadomości e-mail", type="password")
             verify_link = st.form_submit_button("Zweryfikuj link")
         if verify_link:
             parsed = urlparse(link.strip())
@@ -174,7 +174,7 @@ def login_gate():
                 st.stop()
         clear_user_session(st.session_state)
     _login_header()
-    if st.button("Mam link odzyskiwania hasła"):
+    if st.button("Mam link zaproszenia lub odzyskiwania hasła"):
         st.session_state["_test_recovery_open"] = True
         st.rerun()
     with st.form("_test_login_form", clear_on_submit=True):
