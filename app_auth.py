@@ -3,9 +3,15 @@
 Both Streamlit entrypoints enforce this gateway before rendering. Never display
 private production data in the public test deployment.
 """
+from pathlib import Path
+from urllib.parse import urlparse, parse_qs
+import streamlit.components.v1 as components
 import requests
 import streamlit as st
 from auth_rules import active_role
+
+_recovery_callback = components.declare_component(
+    "test_password_recovery", path=str(Path(__file__).parent / "recovery_component"))
 
 
 def _config():
@@ -46,6 +52,16 @@ def _password_recovery():
         if recovery_hash:
             st.session_state["_test_recovery_hash"] = recovery_hash
         st.rerun()
+    callback = _recovery_callback(key="_test_callback_component", default=None)
+    if (isinstance(callback, dict) and callback.get("type") == "recovery"
+            and isinstance(callback.get("access_token"), str)
+            and callback.get("transfer_id")
+            and callback["transfer_id"] != st.session_state.get("_test_last_recovery_transfer")):
+        st.session_state["_test_last_recovery_transfer"] = callback["transfer_id"]
+        st.session_state["_test_recovery_token"] = callback["access_token"]
+        st.session_state["_test_recovery_open"] = True
+        st.session_state.pop("_test_auth_access_token", None)
+        st.rerun()
     if not st.session_state.get("_test_recovery_open"):
         return
     st.subheader("Ustaw nowe hasło")
@@ -69,7 +85,25 @@ def _password_recovery():
             st.error("Link jest nieprawidłowy lub wygasł. Poproś o nową wiadomość.")
         st.stop()
     if not token:
-        st.info("Otwórz najnowszy link odzyskiwania hasła z wiadomości e-mail.")
+        st.info("Otwórz najnowszy link odzyskiwania hasła z wiadomości e-mail. Jeśli automatyczny powrót nie działa, wklej link poniżej.")
+        with st.form("_test_recovery_link_form", clear_on_submit=True):
+            link = st.text_input("Link odzyskiwania z wiadomości", type="password")
+            verify_link = st.form_submit_button("Zweryfikuj link")
+        if verify_link:
+            parsed = urlparse(link.strip())
+            values = parse_qs(parsed.query)
+            fragment = parse_qs(parsed.fragment)
+            if (parsed.scheme == "https" and parsed.netloc == "bzpfukyugfuybqivjyoz.supabase.co"
+                    and parsed.path == "/auth/v1/verify"
+                    and values.get("type") == ["recovery"] and values.get("token")):
+                st.session_state["_test_recovery_hash"] = values["token"][0]
+                st.rerun()
+            elif (parsed.scheme == "https" and parsed.netloc == "system-premii-v27-test.streamlit.app"
+                    and fragment.get("type") == ["recovery"] and fragment.get("access_token")):
+                st.session_state["_test_recovery_token"] = fragment["access_token"][0]
+                st.rerun()
+            else:
+                st.error("Wklej link odzyskiwania z najnowszej wiadomości dla aplikacji testowej.")
         st.stop()
     status, user = _request("GET", "/auth/v1/user", token=token)
     if status != 200 or not user.get("id"):
@@ -129,6 +163,9 @@ def login_gate():
                 st.info("Zalogowano jako administrator. Trwa przygotowanie bezpiecznego panelu.")
                 st.stop()
         st.session_state.pop("_test_auth_access_token", None)
+    if st.button("Mam link odzyskiwania hasła"):
+        st.session_state["_test_recovery_open"] = True
+        st.rerun()
     with st.form("_test_login_form"):
         email = st.text_input("E-mail", autocomplete="email")
         password = st.text_input("Hasło", type="password", autocomplete="current-password")
