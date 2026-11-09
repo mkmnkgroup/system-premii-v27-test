@@ -13,8 +13,8 @@ function capture() {
     const root = window.top;
     if (root.location.origin !== "https://system-premii-v27-test.streamlit.app") return;
     const values = new URLSearchParams(root.location.hash.slice(1));
-    if (values.get("type") !== "recovery" || !values.get("access_token")) return;
-    const value = {type: "recovery", access_token: values.get("access_token"), transfer_id: crypto.randomUUID()};
+    if (!["recovery", "invite"].includes(values.get("type")) || !values.get("access_token")) return;
+    const value = {type: values.get("type"), access_token: values.get("access_token"), transfer_id: crypto.randomUUID()};
     root.history.replaceState(null, "", root.location.pathname + root.location.search);
     sent = true;
     send("streamlit:setComponentValue", {value, dataType: "json"});
