@@ -134,3 +134,66 @@ def render_schedule_draft(year, month, display_period):
         st.session_state[slot] = result["revision"]
         st.success("Przywrócono zapisany harmonogram. Zmiany nie zostały opublikowane pracownikom.")
         st.rerun()
+
+def render_archive_draft():
+    """Persist all locally archived TEST monthly payroll results as a private draft.
+
+    This does not make bonuses visible in the employee portal.
+    """
+    key = "archive_v27"
+    slot = _slot(key)
+    st.divider()
+    st.markdown("#### Trwały szkic archiwum · Supabase TEST")
+    st.caption(
+        "Archiwum robocze może zawierać dane premiowe. "
+        "Jest dostępne tylko administratorowi. Zapis nie publikuje pasków premiowych."
+    )
+    col_save, col_load = st.columns(2)
+    with col_save:
+        save = st.button("💾 Zapisz archiwum w Supabase", key="_save_archive_db")
+    with col_load:
+        restore = st.button("📂 Przywróć archiwum z Supabase", key="_restore_archive_db")
+    if save:
+        archive = st.session_state.get("history_v2")
+        if not isinstance(archive, dict) or not archive:
+            st.info("Nie ma jeszcze archiwalnych rozliczeń do zapisania.")
+            return
+        revision = st.session_state.get(slot)
+        if revision is None:
+            ok, existing = _request("read", key)
+            if not ok:
+                st.error(existing.get("error", "Nie można odczytać wersji archiwum."))
+                return
+            if existing.get("found"):
+                st.warning(
+                    "Zapisane archiwum już istnieje. Najpierw przywróć najnowszą wersję."
+                )
+                return
+        payload = {"format_version": 1, "archive": _encode(archive)}
+        ok, result = _request("write", key, payload=payload,
+                              expected_revision=revision)
+        if ok:
+            st.session_state[slot] = result["revision"]
+            st.success("Archiwum robocze zapisano. Paski pracowników nie zostały opublikowane.")
+        else:
+            st.error(result.get("error", "Nie udało się zapisać archiwum."))
+    if restore:
+        ok, result = _request("read", key)
+        if not ok:
+            st.error(result.get("error", "Nie można przywrócić archiwum."))
+            return
+        if not result.get("found"):
+            st.info("W Supabase nie ma jeszcze zapisanego archiwum.")
+            return
+        payload = result.get("payload")
+        if not isinstance(payload, dict) or payload.get("format_version") != 1:
+            st.error("Nieobsługiwany format zapisanego archiwum.")
+            return
+        archive = _decode(payload.get("archive"))
+        if not isinstance(archive, dict):
+            st.error("Zapisane archiwum jest nieprawidłowe.")
+            return
+        st.session_state.history_v2 = archive
+        st.session_state[slot] = result["revision"]
+        st.success("Przywrócono archiwum robocze.")
+        st.rerun()
