@@ -10,3 +10,4 @@ fpdf2
 PyGithub
 psycopg[binary]>=3.2,<4
 
+requests>=2.31,<3
