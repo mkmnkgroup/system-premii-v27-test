@@ -73,7 +73,7 @@ def render_admin_panel():
                                     format_func=lambda value: ROLE_NAMES[value])
                 display_name = st.text_input("Nazwa wyświetlana", value=item.get("display_name") or "")
                 employee_id = st.text_input("Identyfikator pracownika", value=item.get("employee_id") or "",
-                                            help="Powiąż konto z rekordem pracownika; nie udostępnia to jeszcze pasków premiowych.")
+                                            help="W wersji testowej wpisz dokładnie nazwę z kolumny OSOBA rozliczenia. To przypisanie będzie weryfikowane przed publikacją.")
                 enabled = st.checkbox("Konto aktywne", value=item.get("enabled") is True)
                 submitted = st.form_submit_button("Zapisz zmiany")
             if submitted:
@@ -91,7 +91,7 @@ def render_admin_panel():
     with st.form("_test_invite_form", clear_on_submit=True):
         email = st.text_input("E-mail nowego użytkownika")
         display_name = st.text_input("Imię i nazwisko (opcjonalnie)")
-        employee_id = st.text_input("Identyfikator pracownika (opcjonalnie)")
+        employee_id = st.text_input("Identyfikator pracownika (opcjonalnie)", help="Wpisz dokładnie wartość z kolumny OSOBA rozliczenia testowego.")
         role = st.selectbox("Rola nowego użytkownika", list(ROLE_NAMES), index=3,
                             format_func=lambda value: ROLE_NAMES[value])
         invite = st.form_submit_button("Wyślij zaproszenie", type="primary")
