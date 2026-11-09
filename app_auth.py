@@ -8,7 +8,7 @@ from urllib.parse import urlparse, parse_qs
 import streamlit.components.v1 as components
 import requests
 import streamlit as st
-from auth_rules import active_role
+from auth_rules import active_role, allowed_module, bind_user_session, clear_user_session
 
 _recovery_callback = components.declare_component(
     "test_password_recovery", path=str(Path(__file__).parent / "recovery_component"))
@@ -64,6 +64,7 @@ def _password_recovery():
         st.rerun()
     if not st.session_state.get("_test_recovery_open"):
         return
+    _login_header()
     st.subheader("Ustaw nowe hasło")
     if st.button("Wróć do logowania"):
         for key in list(st.session_state):
@@ -133,10 +134,13 @@ def _password_recovery():
     st.stop()
 
 
-def login_gate():
-    st.set_page_config(page_title="System Premii 2.7 — Logowanie", layout="wide")
+def _login_header():
     st.title("System Premii 2.7")
     st.caption("Środowisko testowe · Dostęp tylko dla upoważnionych użytkowników")
+
+
+def login_gate():
+    st.set_page_config(page_title="System Premii 2.7 — Logowanie", layout="wide")
     _password_recovery()
     if st.session_state.pop("_test_password_changed", False):
         st.success("Hasło zostało zmienione. Zaloguj się nowym hasłem.")
@@ -149,24 +153,25 @@ def login_gate():
                 token=token)
             role = active_role(user, profiles) if status == 200 else None
             if role:
+                if bind_user_session(st.session_state, user["id"]):
+                    st.rerun()
                 st.sidebar.write("Zalogowano:", user.get("email", ""))
                 st.sidebar.write("Rola:", role)
                 if st.sidebar.button("Wyloguj", key="_test_logout"):
                     _request("POST", "/auth/v1/logout", token=token)
-                    st.session_state.pop("_test_auth_access_token", None)
+                    clear_user_session(st.session_state)
                     st.rerun()
-                if role != "admin":
-                    st.info("Konto aktywne. Panel roli jest przygotowywany; dane innych pracowników są niedostępne.")
-                    st.stop()
-                # Do not expose the legacy full-access UI until its data storage
-                # is migrated to per-user authorization.
-                st.info("Zalogowano jako administrator. Trwa przygotowanie bezpiecznego panelu.")
+                if allowed_module(role, "test_workspace"):
+                    return role
+                _login_header()
+                st.info("Konto aktywne. Panel tej roli jest przygotowywany; dane innych pracowników są niedostępne.")
                 st.stop()
-        st.session_state.pop("_test_auth_access_token", None)
+        clear_user_session(st.session_state)
+    _login_header()
     if st.button("Mam link odzyskiwania hasła"):
         st.session_state["_test_recovery_open"] = True
         st.rerun()
-    with st.form("_test_login_form"):
+    with st.form("_test_login_form", clear_on_submit=True):
         email = st.text_input("E-mail", autocomplete="email")
         password = st.text_input("Hasło", type="password", autocomplete="current-password")
         submit = st.form_submit_button("Zaloguj się")
@@ -174,6 +179,7 @@ def login_gate():
         status, data = _request("POST", "/auth/v1/token?grant_type=password",
                                 data={"email": email.strip(), "password": password})
         if status == 200 and data.get("access_token"):
+            clear_user_session(st.session_state)
             st.session_state["_test_auth_access_token"] = data["access_token"]
             st.rerun()
         else:
