@@ -8,11 +8,8 @@ from datetime import datetime
 import io
 import json
 import re
-import google.generativeai as genai
 import holidays
 import pandas as pd
-import PIL.Image
-import plotly.express as px
 import streamlit as st
 
 # ==========================================
@@ -180,6 +177,9 @@ def parse_daily_production_cached(prod_df, year, month_idx):
 
 def process_attendance_photo(image_file, api_key):
   try:
+    # Load AI/image processing only when scanning an attendance photo.
+    import google.generativeai as genai
+    import PIL.Image
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
     img = PIL.Image.open(image_file)
@@ -1440,6 +1440,8 @@ def _render_calculator_tab():
     )
 
     if cur_pcs > 0 or cur_lines > 0 or cur_weight > 0:
+      # Only load Plotly if the daily production chart is requested.
+      import plotly.express as px
       fig_daily = px.bar(
           pd.DataFrame(daily_chart_data),
           x="Data",
@@ -1842,6 +1844,8 @@ if selected_module == "Produkcja i premie":
 # ZAKŁADKA 3: DASHBOARD
 # ==========================================
 if selected_module == "Analizy":
+  # Avoid importing Plotly during login or schedule editing.
+  import plotly.express as px
   st.header("📊 Dashboard Analityczny")
   if period_key in st.session_state.history_v2:
     data_hist = st.session_state.history_v2[period_key]
