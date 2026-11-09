@@ -104,3 +104,62 @@ class AuthEntrypointTests(unittest.TestCase):
         self.assertEqual(list(app.dataframe), [])
         self.assertNotIn("employees_df", app.session_state)
         self.assertNotIn("history_v2", app.session_state)
+
+class PasswordRecoveryTests(unittest.TestCase):
+    def test_missing_link_cannot_show_password_form(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        app.session_state["_test_recovery_open"] = True
+        with patch("app_auth._request") as request:
+            app.run()
+            request.assert_not_called()
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(list(app.text_input), [])
+        self.assertEqual(list(app.radio), [])
+
+    def test_invalid_link_cannot_update_password(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        app.session_state["_test_recovery_open"] = True
+        app.session_state["_test_recovery_hash"] = "invalid-test-link"
+        with patch("app_auth._request", return_value=(400, {})) as request:
+            app.run()
+            next(b for b in app.button if b.label == "Potwierdź link odzyskiwania").click().run()
+            request.assert_called_once_with("POST", "/auth/v1/verify", data={
+                "token_hash": "invalid-test-link", "type": "recovery"})
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(list(app.text_input), [])
+        self.assertNotIn("_test_recovery_token", app.session_state)
+
+    def test_expired_recovery_session_is_rejected(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        app.session_state["_test_recovery_open"] = True
+        app.session_state["_test_recovery_token"] = "expired-test-session"
+        with patch("app_auth._request", return_value=(401, {})) as request:
+            app.run()
+            request.assert_called_once_with("GET", "/auth/v1/user", token="expired-test-session")
+        self.assertEqual(list(app.text_input), [])
+        self.assertNotIn("_test_recovery_token", app.session_state)
+
+    def test_verified_recovery_updates_then_requires_login(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        app.session_state["_test_recovery_open"] = True
+        app.session_state["_test_recovery_hash"] = "synthetic-test-hash"
+        def response(method, path, **kwargs):
+            if path == "/auth/v1/verify":
+                return 200, {"access_token": "synthetic-recovery-session"}
+            if path == "/auth/v1/user":
+                return 200, {"id": "synthetic-test-user"}
+            return 204, {}
+        with patch("app_auth._request", side_effect=response) as request:
+            app.run()
+            next(b for b in app.button if b.label == "Potwierdź link odzyskiwania").click().run()
+            self.assertEqual([f.label for f in app.text_input], ["Nowe hasło", "Powtórz nowe hasło"])
+            self.assertNotIn("_test_auth_access_token", app.session_state)
+            app.text_input[0].set_value("Synthetic-test-only-123!")
+            app.text_input[1].set_value("Synthetic-test-only-123!")
+            next(b for b in app.button if b.label == "Zapisz nowe hasło").click().run()
+            request.assert_any_call("PUT", "/auth/v1/user", token="synthetic-recovery-session",
+                                    data={"password": "Synthetic-test-only-123!"})
+            request.assert_any_call("POST", "/auth/v1/logout", token="synthetic-recovery-session")
+        self.assertEqual(list(app.exception), [])
+        self.assertNotIn("_test_recovery_token", app.session_state)
+        self.assertEqual([f.label for f in app.text_input], ["E-mail", "Hasło"])
