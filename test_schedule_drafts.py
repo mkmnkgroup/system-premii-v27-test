@@ -1,0 +1,141 @@
+"""Explicit, admin-only versioned schedule draft saving for the test application.
+
+The old Streamlit UI still calculates and edits schedules in memory. Nothing
+is published to employee-visible data; saving a draft is a separate action.
+"""
+from datetime import datetime
+
+import pandas as pd
+import requests
+import streamlit as st
+
+from db_storage import _encode, _decode
+
+
+PROJECT_URL = "https://bzpfukyugfuybqivjyoz.supabase.co"
+ENDPOINT = PROJECT_URL + "/functions/v1/test-workflow-drafts"
+
+
+def safe_period(year, month):
+    year = int(year)
+    month = int(month)
+    if not 2000 <= year <= 2100 or not 1 <= month <= 12:
+        raise ValueError("Nieprawidłowy miesiąc.")
+    return f"{year:04d}-{month:02d}"
+
+
+def draft_item_key(year, month, stage="schedule"):
+    if stage not in ("schedule", "attendance", "bonuses", "approval"):
+        raise ValueError("Nieprawidłowy etap procesu.")
+    return f"draft_v27:{safe_period(year, month)}:{stage}"
+
+
+def _request(action, key, *, payload=None, expected_revision=None):
+    token = st.session_state.get("_test_auth_access_token")
+    if not isinstance(token, str) or not token:
+        return False, {"error": "Zaloguj się ponownie."}
+    body = {"action": action, "item_key": key}
+    if action == "write":
+        body.update(payload=payload, expected_revision=expected_revision)
+    try:
+        public_key = str(st.secrets["TEST_SUPABASE_ANON_KEY"])
+        result = requests.post(
+            ENDPOINT,
+            headers={
+                "Authorization": "Bearer " + token,
+                "apikey": public_key,
+                "Content-Type": "application/json",
+            },
+            json=body,
+            timeout=20,
+        )
+        data = result.json()
+        if not isinstance(data, dict):
+            return False, {"error": "Nieprawidłowa odpowiedź serwera."}
+        return result.status_code == 200, data
+    except (requests.RequestException, ValueError, KeyError, FileNotFoundError):
+        return False, {"error": "Nie udało się nawiązać połączenia z testową bazą."}
+
+
+def _slot(state, key):
+    # Revision is bound both to the current logged-in identity and period.
+    return "_test_saved_draft_revision_" + key.replace(":", "_")
+
+
+def render_schedule_draft(year, month):
+    """Save or explicitly restore one month's schedule. Never auto-publish."""
+    key = draft_item_key(year, month)
+    slot = _slot(st.session_state, key)
+    st.divider()
+    st.markdown("#### Trwały szkic harmonogramu · Supabase TEST")
+    st.caption(
+        "Zapis jest oddzielny od publikacji dla pracowników. "
+        "W bazie przechowywany jest wyłącznie szkic wybranego miesiąca."
+    )
+    col_save, col_load = st.columns(2)
+    with col_save:
+        save = st.button("💾 Zapisz szkic w Supabase", key="_save_" + key)
+    with col_load:
+        restore = st.button("📂 Przywróć szkic z Supabase", key="_restore_" + key)
+
+    if save:
+        frame = st.session_state.get("current_schedule_df")
+        if not isinstance(frame, pd.DataFrame) or frame.empty:
+            st.warning("Najpierw przygotuj harmonogram.")
+            return
+        existing_revision = st.session_state.get(slot)
+        if existing_revision is None:
+            ok, existing = _request("read", key)
+            if not ok:
+                st.error(existing.get("error", "Nie można sprawdzić wcześniejszego zapisu."))
+                return
+            if existing.get("found"):
+                st.warning(
+                    "W bazie istnieje już szkic za ten miesiąc. "
+                    "Użyj „Przywróć szkic”, aby najpierw odczytać najnowszą wersję."
+                )
+                return
+        payload = {
+            "schedule": _encode(frame),
+            "period": safe_period(year, month),
+            "format_version": 1,
+        }
+        ok, result = _request("write", key, payload=payload,
+                              expected_revision=existing_revision)
+        if ok:
+            st.session_state[slot] = result["revision"]
+            st.success("Szkic harmonogramu zapisano w testowej bazie Supabase.")
+        else:
+            st.error(result.get("error", "Nie zapisano szkicu."))
+
+    if restore:
+        ok, result = _request("read", key)
+        if not ok:
+            st.error(result.get("error", "Nie można odczytać szkicu."))
+            return
+        if not result.get("found"):
+            st.info("Brak zapisanego szkicu za ten miesiąc.")
+            return
+        payload = result.get("payload") or {}
+        if (not isinstance(payload, dict)
+                or payload.get("format_version") != 1
+                or payload.get("period") != safe_period(year, month)):
+            st.error("Zapisany szkic ma nieobsługiwany format.")
+            return
+        try:
+            frame = _decode(payload["schedule"])
+        except (KeyError, ValueError, TypeError):
+            st.error("Nie można odtworzyć harmonogramu.")
+            return
+        required = {"OSOBA", "DATA", "DZIEŃ PRACUJĄCY/WOLNY", "CZAS ZMIANY"}
+        if not isinstance(frame, pd.DataFrame) or not required.issubset(frame.columns):
+            st.error("Niekompletny zapis harmonogramu.")
+            return
+        st.session_state.current_schedule_df = frame
+        st.session_state.schedule_period_key = (
+            st.session_state.get("current_selected_schedule_period")
+            or st.session_state.get("schedule_period_key")
+        )
+        st.session_state[slot] = result["revision"]
+        st.success("Przywrócono zapisany harmonogram. Zmiany nie zostały opublikowane pracownikom.")
+        st.rerun()
