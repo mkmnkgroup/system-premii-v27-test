@@ -27,5 +27,5 @@ window.addEventListener("message", event => {
   send("streamlit:setFrameHeight", {height: 0});
   capture();
 });
-send("streamlit:setComponentReady", {apiVersion: 1});
+send("streamlit:componentReady", {apiVersion: 1});
 </script></body></html>
