@@ -16,6 +16,12 @@ APP = str(Path(__file__).resolve().parents[1] / "app_v2.py")
 
 
 class PreviewTests(unittest.TestCase):
+    def setUp(self):
+        # Exercise the legacy calculator independently of the Auth boundary.
+        gate = patch("app_auth.login_gate", return_value=None)
+        gate.start()
+        self.addCleanup(gate.stop)
+
     def test_session_isolation_and_copy(self):
         first, second = {}, {}
         original = {"summary": pd.DataFrame({"Premia": [123.0]})}
@@ -87,3 +93,14 @@ class PreviewTests(unittest.TestCase):
             self.assertEqual(app.session_state.employees_df["OSOBA"].tolist(), ["TEST IMPORT 99"])
             roundtrip = read_employees_excel(write_employees_excel(app.session_state.employees_df))
             self.assertEqual(roundtrip["OSOBA"].tolist(), ["TEST IMPORT 99"])
+
+class AuthEntrypointTests(unittest.TestCase):
+    def test_anonymous_user_sees_login_without_payroll(self):
+        app = AppTest.from_file(APP, default_timeout=45).run()
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual([field.label for field in app.text_input], ["E-mail", "Hasło"])
+        self.assertTrue(any(button.label == "Zaloguj się" for button in app.button))
+        self.assertEqual(list(app.radio), [])
+        self.assertEqual(list(app.dataframe), [])
+        self.assertNotIn("employees_df", app.session_state)
+        self.assertNotIn("history_v2", app.session_state)
