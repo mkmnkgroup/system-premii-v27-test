@@ -81,6 +81,11 @@ class TestMonthlyPublication(unittest.TestCase):
         with self.assertRaises(PublicationValidationError):
             prepare_publication("Listopad 2026", self.archive, self.profiles)
 
+    def test_schedule_from_wrong_month_is_rejected(self):
+        self.archive["schedule"].loc[0, "DATA"] = "02.12.2026"
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
     def test_attendance_exceeding_plan_is_rejected(self):
         self.archive["summary"].loc[0, "Dni przepracowane"] = 2
         with self.assertRaises(PublicationValidationError):
