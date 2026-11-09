@@ -1,3 +1,8 @@
+from app_auth import login_gate
+
+# Authenticate before rendering any test payroll UI.
+login_gate()
+
 import calendar
 from datetime import datetime
 import io
