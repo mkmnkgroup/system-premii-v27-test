@@ -25,5 +25,21 @@ def active_role(user, profiles):
 
 
 def allowed_module(role, module):
-    """Fail closed. All legacy employee/payroll features remain inaccessible."""
-    return role == "admin" and module == "test_auth_status"
+    """Only a verified admin can use the isolated test workspace."""
+    return role == "admin" and module in {"test_auth_status", "test_workspace"}
+
+def bind_user_session(state, user_id):
+    """Discard all previous workspace data before binding a verified identity."""
+    if state.get("_test_work_user_id") == user_id:
+        return False
+    token = state.get("_test_auth_access_token")
+    state.clear()
+    if token:
+        state["_test_auth_access_token"] = token
+    state["_test_work_user_id"] = user_id
+    return True
+
+
+def clear_user_session(state):
+    """Remove workspace data, identity, widget values and credentials on logout."""
+    state.clear()
