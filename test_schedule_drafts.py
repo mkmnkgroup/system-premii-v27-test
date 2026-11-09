@@ -3,8 +3,6 @@
 The old Streamlit UI still calculates and edits schedules in memory. Nothing
 is published to employee-visible data; saving a draft is a separate action.
 """
-from datetime import datetime
-
 import pandas as pd
 import requests
 import streamlit as st
@@ -57,15 +55,15 @@ def _request(action, key, *, payload=None, expected_revision=None):
         return False, {"error": "Nie udało się nawiązać połączenia z testową bazą."}
 
 
-def _slot(state, key):
+def _slot(key):
     # Revision is bound both to the current logged-in identity and period.
     return "_test_saved_draft_revision_" + key.replace(":", "_")
 
 
-def render_schedule_draft(year, month):
+def render_schedule_draft(year, month, display_period):
     """Save or explicitly restore one month's schedule. Never auto-publish."""
     key = draft_item_key(year, month)
-    slot = _slot(st.session_state, key)
+    slot = _slot(key)
     st.divider()
     st.markdown("#### Trwały szkic harmonogramu · Supabase TEST")
     st.caption(
@@ -132,10 +130,7 @@ def render_schedule_draft(year, month):
             st.error("Niekompletny zapis harmonogramu.")
             return
         st.session_state.current_schedule_df = frame
-        st.session_state.schedule_period_key = (
-            st.session_state.get("current_selected_schedule_period")
-            or st.session_state.get("schedule_period_key")
-        )
+        st.session_state.schedule_period_key = display_period
         st.session_state[slot] = result["revision"]
         st.success("Przywrócono zapisany harmonogram. Zmiany nie zostały opublikowane pracownikom.")
         st.rerun()
