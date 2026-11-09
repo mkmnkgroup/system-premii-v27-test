@@ -168,9 +168,14 @@ def login_gate():
                     if st.session_state.get("_test_admin_panel"):
                         from admin_users import render_admin_panel
                         render_admin_panel()
+                    if st.sidebar.button("📊 Raporty testowe", key="_test_reports_button"):
+                        st.session_state["_test_reports_panel"] = not st.session_state.get("_test_reports_panel", False)
+                    if st.session_state.get("_test_reports_panel"):
+                        from role_views import render_role_dashboard
+                        render_role_dashboard(role, user["id"])
                     return role
-                _login_header()
-                st.info("Konto aktywne. Panel tej roli jest przygotowywany; dane innych pracowników są niedostępne.")
+                from role_views import render_role_dashboard
+                render_role_dashboard(role, user["id"])
                 st.stop()
         clear_user_session(st.session_state)
     _login_header()
