@@ -175,3 +175,41 @@ class PasswordRecoveryTests(unittest.TestCase):
         self.assertEqual(list(app.text_input), [])
         self.assertNotIn("_test_recovery_token", app.session_state)
         self.assertNotIn("_test_auth_access_token", app.session_state)
+
+class RecoveryFrontendTests(unittest.TestCase):
+    def test_ready_handshake_and_single_callback_transfer(self):
+        import subprocess
+        frontend = Path(__file__).resolve().parents[1] / "recovery_component" / "index.html"
+        script = r'''
+const assert = require("node:assert/strict");
+const vm = require("node:vm");
+const fs = require("node:fs");
+const source = fs.readFileSync(process.argv[1], "utf8").split("<script>")[1].split("</script>")[0];
+const messages = [];
+let listener;
+let replaced;
+const parent = {postMessage: message => messages.push(message)};
+const location = {origin: "https://system-premii-v27-test.streamlit.app", pathname: "/", search: "", hash: ""};
+const root = {location, history: {replaceState: (_, __, url) => {replaced = url; location.hash = "";}}};
+const window = {parent, top: root, addEventListener: (_, callback) => {listener = callback;}};
+vm.runInNewContext(source, {window, URLSearchParams, crypto: require("node:crypto").webcrypto});
+assert.equal(messages[0].type, "streamlit:componentReady");
+assert.equal(messages[0].apiVersion, 1);
+listener({source: {}, data: {type: "streamlit:render"}});
+assert.equal(messages.length, 1);
+listener({source: parent, data: {type: "streamlit:render"}});
+assert.equal(messages[1].type, "streamlit:setFrameHeight");
+assert.equal(messages.filter(m => m.type === "streamlit:setComponentValue").length, 0);
+location.hash = "#type=recovery&access_token=synthetic-frontend-session";
+listener({source: parent, data: {type: "streamlit:render"}});
+const callbacks = messages.filter(m => m.type === "streamlit:setComponentValue");
+assert.equal(callbacks.length, 1);
+assert.equal(callbacks[0].value.type, "recovery");
+assert.equal(callbacks[0].value.access_token, "synthetic-frontend-session");
+assert.equal(replaced, "/");
+assert.equal(location.hash, "");
+listener({source: parent, data: {type: "streamlit:render"}});
+assert.equal(messages.filter(m => m.type === "streamlit:setComponentValue").length, 1);
+'''
+        result = subprocess.run(["node", "-e", script, str(frontend)], capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
