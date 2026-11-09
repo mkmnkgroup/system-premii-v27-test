@@ -1878,6 +1878,8 @@ if selected_module == "Analizy":
 # ==========================================
 if selected_module == "Archiwum":
   st.header("📁 Archiwum Zapisanych Rozliczeń")
+  from test_schedule_drafts import render_archive_draft
+  render_archive_draft()
   if st.session_state.history_v2:
     selected_period = st.selectbox(
         "Wybierz okres z archiwum:", list(st.session_state.history_v2.keys())
