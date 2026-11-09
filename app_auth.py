@@ -53,7 +53,7 @@ def _password_recovery():
             st.session_state["_test_recovery_hash"] = recovery_hash
         st.rerun()
     callback = _recovery_callback(key="_test_callback_component", default=None)
-    if (isinstance(callback, dict) and callback.get("type") == "recovery"
+    if (isinstance(callback, dict) and callback.get("type") in ("recovery", "invite")
             and isinstance(callback.get("access_token"), str)
             and callback.get("transfer_id")
             and callback["transfer_id"] != st.session_state.get("_test_last_recovery_transfer")):
@@ -65,7 +65,7 @@ def _password_recovery():
     if not st.session_state.get("_test_recovery_open"):
         return
     _login_header()
-    st.subheader("Ustaw nowe hasło")
+    st.subheader("Ustaw hasło do konta")
     if st.button("Wróć do logowania"):
         for key in list(st.session_state):
             if key.startswith("_test_recovery_"):
@@ -77,7 +77,7 @@ def _password_recovery():
         st.caption("Potwierdź, że chcesz wykorzystać jednorazowy link z wiadomości.")
         if st.button("Potwierdź link odzyskiwania"):
             status, result = _request("POST", "/auth/v1/verify", data={
-                "token_hash": recovery_hash, "type": "recovery"})
+                "token_hash": recovery_hash, "type": st.session_state.get("_test_recovery_kind", "recovery")})
             st.session_state.pop("_test_recovery_hash", None)
             if status == 200 and result.get("access_token"):
                 st.session_state["_test_recovery_token"] = result["access_token"]
@@ -86,7 +86,7 @@ def _password_recovery():
             st.error("Link jest nieprawidłowy lub wygasł. Poproś o nową wiadomość.")
         st.stop()
     if not token:
-        st.info("Otwórz najnowszy link odzyskiwania hasła z wiadomości e-mail. Jeśli automatyczny powrót nie działa, wklej link poniżej.")
+        st.info("Otwórz najnowszy link zaproszenia lub odzyskiwania hasła z wiadomości e-mail. Jeśli automatyczny powrót nie działa, wklej link poniżej.")
         with st.form("_test_recovery_link_form", clear_on_submit=True):
             link = st.text_input("Link odzyskiwania z wiadomości", type="password")
             verify_link = st.form_submit_button("Zweryfikuj link")
@@ -96,15 +96,16 @@ def _password_recovery():
             fragment = parse_qs(parsed.fragment)
             if (parsed.scheme == "https" and parsed.netloc == "bzpfukyugfuybqivjyoz.supabase.co"
                     and parsed.path == "/auth/v1/verify"
-                    and values.get("type") == ["recovery"] and values.get("token")):
+                    and values.get("type") in (["recovery"], ["invite"]) and values.get("token")):
                 st.session_state["_test_recovery_hash"] = values["token"][0]
+                st.session_state["_test_recovery_kind"] = values["type"][0]
                 st.rerun()
             elif (parsed.scheme == "https" and parsed.netloc == "system-premii-v27-test.streamlit.app"
-                    and fragment.get("type") == ["recovery"] and fragment.get("access_token")):
+                    and fragment.get("type") in (["recovery"], ["invite"]) and fragment.get("access_token")):
                 st.session_state["_test_recovery_token"] = fragment["access_token"][0]
                 st.rerun()
             else:
-                st.error("Wklej link odzyskiwania z najnowszej wiadomości dla aplikacji testowej.")
+                st.error("Wklej link zaproszenia lub odzyskiwania z najnowszej wiadomości dla aplikacji testowej.")
         st.stop()
     status, user = _request("GET", "/auth/v1/user", token=token)
     if status != 200 or not user.get("id"):
