@@ -16,7 +16,10 @@ alter table public.app_user_profiles enable row level security;
 revoke all on public.app_user_profiles from anon;
 grant select on public.app_user_profiles to authenticated;
 -- Security-definer helper prevents recursive RLS checks; locked search path.
-create or replace function public.is_app_admin()
+create schema if not exists app_auth_private;
+revoke all on schema app_auth_private from public, anon;
+grant usage on schema app_auth_private to authenticated;
+create or replace function app_auth_private.is_app_admin()
 returns boolean language sql stable security definer
 set search_path = '' as $$
   select exists (
@@ -25,15 +28,15 @@ set search_path = '' as $$
       and p.role = 'admin' and p.enabled
   );
 $$;
-revoke all on function public.is_app_admin() from public, anon;
-grant execute on function public.is_app_admin() to authenticated;
+revoke all on function app_auth_private.is_app_admin() from public, anon;
+grant execute on function app_auth_private.is_app_admin() to authenticated;
 drop policy if exists "read_own_enabled_profile" on public.app_user_profiles;
 create policy "read_own_enabled_profile" on public.app_user_profiles
   for select to authenticated
   using (user_id = (select auth.uid()) and enabled);
 drop policy if exists "admin_read_profiles" on public.app_user_profiles;
 create policy "admin_read_profiles" on public.app_user_profiles
-  for select to authenticated using ((select public.is_app_admin()));
+  for select to authenticated using ((select app_auth_private.is_app_admin()));
 -- No client INSERT/UPDATE/DELETE policies. Account provisioning and role changes
 -- must happen through an audited server-side administrative workflow.
 commit;
