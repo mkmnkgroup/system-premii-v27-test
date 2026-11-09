@@ -1890,6 +1890,10 @@ if selected_module == "Archiwum":
           st.session_state.history_v2[selected_period]["summary"],
           use_container_width=True,
       )
+      from month_publication_ui import render_month_publication
+      render_month_publication(
+          selected_period, st.session_state.history_v2[selected_period]
+      )
   else:
     st.info("Brak zapisanych okresów w archiwum.")
 
