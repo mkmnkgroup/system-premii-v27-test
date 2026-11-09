@@ -86,6 +86,10 @@ def prepare_publication(label, archive, profiles):
     required_schedule = {"OSOBA", "DATA", "DZIEŃ PRACUJĄCY/WOLNY"}
     if not required_summary.issubset(summary.columns) or not required_schedule.issubset(schedule.columns):
         raise PublicationValidationError("Archiwum nie zawiera wymaganych pól.")
+    # Never release attendance/bonus totals under a different calendar month.
+    schedule_dates = pd.to_datetime(schedule["DATA"].astype(str), format="%d.%m.%Y", errors="coerce")
+    if schedule_dates.isna().any() or any(day.strftime("%Y-%m") != period[:7] for day in schedule_dates):
+        raise PublicationValidationError("Harmonogram pochodzi z innego miesiąca lub ma błędne daty.")
 
     kpis = {
         "positions": _int(metrics.get("lines"), "pozycje"),
