@@ -213,3 +213,76 @@ assert.equal(messages.filter(m => m.type === "streamlit:setComponentValue").leng
 '''
         result = subprocess.run(["node", "-e", script, str(frontend)], capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+class AuthenticatedWorkspaceTests(unittest.TestCase):
+    def response(self, role="admin", enabled=True, user_id="synthetic-admin"):
+        def api(method, path, **kwargs):
+            if method == "GET" and path == "/auth/v1/user":
+                return 200, {"id": user_id, "email": "admin@example.invalid"}
+            if method == "GET" and path.startswith("/rest/v1/app_user_profiles?"):
+                return 200, [{"user_id": user_id, "role": role, "enabled": enabled, "employee_id": None}]
+            return 204, {}
+        return api
+
+    def authenticated_app(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        app.session_state["_test_auth_access_token"] = "synthetic-test-access"
+        return app
+
+    def test_verified_admin_reaches_workspace_and_employee_settings(self):
+        app = self.authenticated_app()
+        with patch("app_auth._request", side_effect=self.response()):
+            app.run()
+            self.assertEqual(list(app.exception), [])
+            self.assertTrue(any(r.label == "Moduł" for r in app.radio))
+            next(r for r in app.radio if r.label == "Moduł").set_value("Ustawienia").run()
+            self.assertEqual(list(app.exception), [])
+            self.assertEqual(len(app.session_state.employees_df), 3)
+            self.assertTrue(any("Zespół i Pracownicy" in h.value for h in app.subheader))
+
+    def test_non_admin_roles_cannot_reach_workspace(self):
+        for role in ("employee", "manager", "director"):
+            with self.subTest(role=role):
+                app = self.authenticated_app()
+                with patch("app_auth._request", side_effect=self.response(role=role)):
+                    app.run()
+                self.assertEqual(list(app.exception), [])
+                self.assertEqual(list(app.radio), [])
+                self.assertNotIn("employees_df", app.session_state)
+                self.assertNotIn("history_v2", app.session_state)
+
+    def test_logout_clears_auth_and_all_workspace_data(self):
+        app = self.authenticated_app()
+        with patch("app_auth._request", side_effect=self.response()):
+            app.run()
+            app.session_state["_preview_store"] = {"private-test": "old-value"}
+            next(b for b in app.button if b.label == "Wyloguj").click().run()
+        self.assertEqual(list(app.exception), [])
+        for key in ("_test_auth_access_token", "_test_work_user_id", "_preview_store", "employees_df", "history_v2"):
+            self.assertNotIn(key, app.session_state)
+        self.assertEqual([f.label for f in app.text_input], ["E-mail", "Hasło"])
+
+    def test_identity_switch_discards_previous_workspace(self):
+        app = self.authenticated_app()
+        app.session_state["_test_work_user_id"] = "previous-user"
+        app.session_state["_preview_store"] = {"private-test": "previous-user-data"}
+        app.session_state["employees_df"] = pd.DataFrame({"OSOBA": ["PREVIOUS USER EMPLOYEE"]})
+        with patch("app_auth._request", side_effect=self.response()):
+            app.run()
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(app.session_state["_test_work_user_id"], "synthetic-admin")
+        self.assertNotIn("_preview_store", app.session_state)
+        self.assertNotIn("PREVIOUS USER EMPLOYEE", app.session_state.employees_df["OSOBA"].tolist())
+
+    def test_expired_token_and_disabled_profile_clear_workspace(self):
+        for result in (lambda *a, **kw: (401, {}), self.response(enabled=False)):
+            app = self.authenticated_app()
+            app.session_state["employees_df"] = pd.DataFrame({"OSOBA": ["PRIVATE TEST"]})
+            app.session_state["_preview_store"] = {"private-test": "old-value"}
+            with patch("app_auth._request", side_effect=result):
+                app.run()
+            self.assertEqual(list(app.exception), [])
+            self.assertNotIn("_test_auth_access_token", app.session_state)
+            self.assertNotIn("employees_df", app.session_state)
+            self.assertNotIn("_preview_store", app.session_state)
+            self.assertEqual(list(app.radio), [])
