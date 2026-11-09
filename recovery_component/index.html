@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"></head>
+<body style="margin:0"><script>
+// Supabase's default recovery email returns a session in the URL fragment.
+// Transfer it to this tab's Streamlit session, then remove it from the URL.
+let sent = false;
+function send(type, extra) {
+  window.parent.postMessage({isStreamlitMessage: true, type, ...extra}, "*");
+}
+function capture() {
+  if (sent) return;
+  try {
+    const root = window.top;
+    if (root.location.origin !== "https://system-premii-v27-test.streamlit.app") return;
+    const values = new URLSearchParams(root.location.hash.slice(1));
+    if (values.get("type") !== "recovery" || !values.get("access_token")) return;
+    const value = {type: "recovery", access_token: values.get("access_token"), transfer_id: crypto.randomUUID()};
+    root.history.replaceState(null, "", root.location.pathname + root.location.search);
+    sent = true;
+    send("streamlit:setComponentValue", {value, dataType: "json"});
+  } catch (_) {
+    // A browser that isolates the wrapper can use the secure link input instead.
+  }
+}
+window.addEventListener("message", event => {
+  if (event.source !== window.parent || event.data?.type !== "streamlit:render") return;
+  send("streamlit:setFrameHeight", {height: 0});
+  capture();
+});
+send("streamlit:setComponentReady", {apiVersion: 1});
+</script></body></html>
