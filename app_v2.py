@@ -1150,6 +1150,10 @@ if selected_module == "Harmonogram":
   if isinstance(edited_df, pd.DataFrame):
     st.session_state.current_schedule_df = edited_df
 
+  # This is an explicit, versioned TEST draft, not a payroll publication.
+  from test_schedule_drafts import render_schedule_draft
+  render_schedule_draft(gen_year, gen_month_idx, period_key)
+
 # ==========================================
 # ZAKŁADKA 2: KALKULATOR PREMII
 # ==========================================
