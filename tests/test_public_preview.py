@@ -113,7 +113,7 @@ class PasswordRecoveryTests(unittest.TestCase):
             app.run()
             request.assert_not_called()
         self.assertEqual(list(app.exception), [])
-        self.assertEqual(list(app.text_input), [])
+        self.assertEqual([f.label for f in app.text_input], ["Link odzyskiwania z wiadomości"])
         self.assertEqual(list(app.radio), [])
 
     def test_invalid_link_cannot_update_password(self):
@@ -163,3 +163,15 @@ class PasswordRecoveryTests(unittest.TestCase):
         self.assertEqual(list(app.exception), [])
         self.assertNotIn("_test_recovery_token", app.session_state)
         self.assertEqual([f.label for f in app.text_input], ["E-mail", "Hasło"])
+
+    def test_default_email_callback_requires_server_verification(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        callback = {"type": "recovery", "access_token": "synthetic-callback-session", "transfer_id": "test-transfer"}
+        with patch("app_auth._recovery_callback", return_value=callback), patch(
+                "app_auth._request", return_value=(401, {})) as request:
+            app.run()
+            request.assert_called_once_with("GET", "/auth/v1/user", token="synthetic-callback-session")
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(list(app.text_input), [])
+        self.assertNotIn("_test_recovery_token", app.session_state)
+        self.assertNotIn("_test_auth_access_token", app.session_state)
