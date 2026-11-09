@@ -1,4 +1,4 @@
-streamlit>=1.50,<2
+streamlit==1.66.0
 google-generativeai
 pandas>=2.2,<3
 openpyxl
@@ -11,3 +11,6 @@ PyGithub
 psycopg[binary]>=3.2,<4
 
 requests>=2.31,<3
+
+# Cloud 2026-11: avoid pyarrow 26.0.1 regression and extra host reinstall.
+pyarrow==24.0.0
