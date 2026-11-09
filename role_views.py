@@ -115,9 +115,9 @@ def _my_month(period, user_id):
         return None
     row = rows[0]
     c1, c2, c3 = st.columns(3)
-    c1.metric("Moje pozycje", row.get("positions", "—"))
-    c2.metric("Moje sztuki", row.get("pieces", "—"))
-    c3.metric("Moja masa towaru (kg)", row.get("weight_kg", "—"))
+    c1.metric("Moje pozycje", row.get("positions") if row.get("positions") is not None else "Brak danych")
+    c2.metric("Moje sztuki", row.get("pieces") if row.get("pieces") is not None else "Brak danych")
+    c3.metric("Moja masa towaru (kg)", row.get("weight_kg") if row.get("weight_kg") is not None else "Brak danych")
     a, b = st.columns(2)
     a.metric("Dni zaplanowane", row.get("planned_days", "—"))
     b.metric("Dni obecności", row.get("attended_days", "—"))
@@ -134,13 +134,15 @@ def _my_payslip(period, user_id):
     else:
         row = rows[0]
         c1, c2 = st.columns(2)
-        c1.metric("Premia bazowa (PLN)", row.get("bonus_base_pln", "—"))
-        c2.metric("Premia końcowa (PLN)", row.get("bonus_final_pln", "—"))
-        st.metric("Korekta za nieobecności (%)", row.get("absence_reduction_pct", "—"))
+        c1.metric("Premia główna (PLN)", row.get("bonus_main_pln", "—"))
+        c2.metric("Dodatki (PLN)", row.get("bonus_additions_pln", "—"))
+        st.metric("Premia końcowa (PLN)", row.get("bonus_final_pln", "—"))
+        st.caption("Potrącenie za nieobecności: " + str(row.get("absence_reduction_pct", "—")) + "%")
         st.caption("Testowy pasek premiowy. Nie stanowi dokumentu płacowego.")
         slip = (
             f"TESTOWY PASEK PREMIOWY\nOkres: {period[:7]}\n"
-            f"Premia bazowa (PLN): {row.get('bonus_base_pln')}\n"
+            f"Premia główna (PLN): {row.get('bonus_main_pln')}\n"
+            f"Dodatki (PLN): {row.get('bonus_additions_pln')}\n"
             f"Korekta za nieobecności (%): {row.get('absence_reduction_pct')}\n"
             f"Premia końcowa (PLN): {row.get('bonus_final_pln')}\n"
         )
