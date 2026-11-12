@@ -562,14 +562,11 @@ def calculate_payroll(
     func = emp_info.get("FUNKCJA", "")
     emp_forklift_hours = float(fk_dict.get(emp_name, 0.0))
 
-    days_worked = len(
-        emp_df[
-            (emp_df["DZIEŃ PRACUJĄCY/WOLNY"] == "Pracujący")
-            & (emp_df["NIEOBECNOŚĆ"].isin(["Brak", "", "None"]))
-        ]
-    )
-    absent_rows = emp_df[~emp_df["NIEOBECNOŚĆ"].isin(["Brak", "", "None"])]
-    absent_days = len(absent_rows)
+    from attendance_validation import analyze_attendance
+    attendance = analyze_attendance(emp_df)
+    days_worked = attendance["confirmed"]
+    absent_rows = emp_df.loc[list(attendance["absent_indices"])]
+    absent_days = attendance["absent"]
     total_ot = emp_df["NADGODZINY (godz.)"].sum()
 
     ot_rate = st.session_state.ot_magazynier
@@ -1651,6 +1648,22 @@ def _render_calculator_tab():
         return
 
     # OBLICZENIA I PODSUMOWANIE ZESPOŁU
+    from attendance_validation import analyze_attendance, AttendanceValidationError
+    try:
+      attendance_check = [
+          analyze_attendance(df_sched.loc[df_sched["OSOBA"] == employee])
+          for employee in st.session_state.employees_df["OSOBA"].dropna().unique()
+      ]
+    except AttendanceValidationError as exc:
+      st.error(f"Nie można obliczyć premii: {exc}")
+      return
+    pending_confirmations = sum(item["unconfirmed"] for item in attendance_check)
+    if pending_confirmations:
+      st.warning(
+          f"Niepotwierdzone dni robocze: {pending_confirmations}. "
+          "Rozliczenie pozostaje robocze; publikacja do kont pracowników "
+          "będzie zablokowana do czasu potwierdzenia godzin lub nieobecności."
+      )
     summary_df, emp_details_map = calculate_payroll(
         df_sched=df_sched,
         employees_df=st.session_state.employees_df,
