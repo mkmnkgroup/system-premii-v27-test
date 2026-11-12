@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from uuid import UUID
 
 import pandas as pd
+from attendance_validation import analyze_attendance, AttendanceValidationError
 
 MONTHS = {
     "Styczeń": 1, "Luty": 2, "Marzec": 3, "Kwiecień": 4,
@@ -153,9 +154,16 @@ def prepare_publication(label, archive, profiles):
         ]
         if own_schedule.empty:
             raise PublicationValidationError(f"Brak harmonogramu dla pracownika „{name}”.")
-        planned = int((own_schedule["DZIEŃ PRACUJĄCY/WOLNY"] == "Pracujący").sum())
-        if planned > 31 or worked > planned:
-            raise PublicationValidationError(f"Nieprawidłowa obecność pracownika „{name}”.")
+        try:
+            attendance = analyze_attendance(own_schedule, require_complete=True)
+        except AttendanceValidationError as exc:
+            raise PublicationValidationError(f"Pracownik „{name}”: {exc}") from None
+        planned = attendance["planned"]
+        if planned > 31 or worked != attendance["confirmed"]:
+            raise PublicationValidationError(
+                f"Nieprawidłowa liczba przepracowanych dni pracownika „{name}”: "
+                f"potwierdzono {attendance['confirmed']}, w rozliczeniu {worked}."
+            )
         rows.append({
             "user_id": uid,
             "employee_name": name,
