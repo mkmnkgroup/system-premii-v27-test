@@ -60,6 +60,40 @@ def _slot(key):
     return "_test_saved_draft_revision_" + key.replace(":", "_")
 
 
+def decode_schedule_payload(payload, year, month):
+    """Validate saved schedule before replacing the current session."""
+    if (not isinstance(payload, dict)
+            or payload.get("format_version") != 1
+            or payload.get("period") != safe_period(year, month)):
+        raise ValueError("Nieobsługiwany format harmonogramu.")
+    frame = _decode(payload["schedule"])
+    required = {"OSOBA", "DATA", "DZIEŃ PRACUJĄCY/WOLNY", "CZAS ZMIANY"}
+    if not isinstance(frame, pd.DataFrame) or not required.issubset(frame.columns):
+        raise ValueError("Niekompletny harmonogram.")
+    if frame.empty:
+        raise ValueError("Pusty harmonogram.")
+    dates = pd.to_datetime(frame["DATA"].astype(str), format="%d.%m.%Y", errors="coerce")
+    if dates.isna().any() or any(d.strftime("%Y-%m") != safe_period(year, month) for d in dates):
+        raise ValueError("Harmonogram zawiera daty z innego miesiąca.")
+    return frame
+
+
+def decode_archive_payload(payload):
+    """Reject damaged monthly payroll archives without touching local state."""
+    if not isinstance(payload, dict) or payload.get("format_version") != 1:
+        raise ValueError("Nieobsługiwany format archiwum.")
+    archive = _decode(payload["archive"])
+    if not isinstance(archive, dict) or any(
+        not isinstance(period, str) or not isinstance(record, dict)
+        or not isinstance(record.get("summary"), pd.DataFrame)
+        or not isinstance(record.get("schedule"), pd.DataFrame)
+        or not isinstance(record.get("metrics"), dict)
+        for period, record in archive.items()
+    ):
+        raise ValueError("Uszkodzony zapis archiwum.")
+    return archive
+
+
 def render_schedule_draft(year, month, display_period):
     """Save or explicitly restore one month's schedule. Never auto-publish."""
     key = draft_item_key(year, month)
@@ -114,20 +148,10 @@ def render_schedule_draft(year, month, display_period):
         if not result.get("found"):
             st.info("Brak zapisanego szkicu za ten miesiąc.")
             return
-        payload = result.get("payload") or {}
-        if (not isinstance(payload, dict)
-                or payload.get("format_version") != 1
-                or payload.get("period") != safe_period(year, month)):
-            st.error("Zapisany szkic ma nieobsługiwany format.")
-            return
         try:
-            frame = _decode(payload["schedule"])
-        except (KeyError, ValueError, TypeError):
-            st.error("Nie można odtworzyć harmonogramu.")
-            return
-        required = {"OSOBA", "DATA", "DZIEŃ PRACUJĄCY/WOLNY", "CZAS ZMIANY"}
-        if not isinstance(frame, pd.DataFrame) or not required.issubset(frame.columns):
-            st.error("Niekompletny zapis harmonogramu.")
+            frame = decode_schedule_payload(result.get("payload"), year, month)
+        except (ValueError, TypeError, KeyError):
+            st.error("Nie można odtworzyć harmonogramu. Zapis ma błędny format lub miesiąc.")
             return
         st.session_state.current_schedule_df = frame
         # Bump editor identity so the previous session's cell edits cannot
@@ -190,23 +214,10 @@ def render_archive_draft():
         if not result.get("found"):
             st.info("W Supabase nie ma jeszcze zapisanego archiwum.")
             return
-        payload = result.get("payload")
-        if not isinstance(payload, dict) or payload.get("format_version") != 1:
-            st.error("Nieobsługiwany format zapisanego archiwum.")
-            return
         try:
-            archive = _decode(payload.get("archive"))
+            archive = decode_archive_payload(result.get("payload"))
         except (TypeError, ValueError, KeyError):
-            st.error("Zapisane archiwum jest uszkodzone; nie nadpisano danych lokalnych.")
-            return
-        if not isinstance(archive, dict) or any(
-            not isinstance(period, str) or not isinstance(record, dict)
-            or not isinstance(record.get("summary"), pd.DataFrame)
-            or not isinstance(record.get("schedule"), pd.DataFrame)
-            or not isinstance(record.get("metrics"), dict)
-            for period, record in archive.items()
-        ):
-            st.error("Zapisane archiwum jest nieprawidłowe; nie zmieniono bieżących danych.")
+            st.error("Nieprawidłowy zapis archiwum; bieżące dane nie zostały zmienione.")
             return
         st.session_state.history_v2 = archive
         st.session_state[slot] = result["revision"]
