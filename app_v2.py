@@ -1648,7 +1648,7 @@ def _render_calculator_tab():
         return
 
     # OBLICZENIA I PODSUMOWANIE ZESPOŁU
-    from attendance_validation import AttendanceValidationError
+    from attendance_validation import analyze_attendance, AttendanceValidationError
     try:
       attendance_check = [
           analyze_attendance(df_sched.loc[df_sched["OSOBA"] == employee])
