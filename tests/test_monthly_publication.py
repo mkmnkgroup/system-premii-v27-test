@@ -29,6 +29,9 @@ class TestMonthlyPublication(unittest.TestCase):
                 "OSOBA": self.name,
                 "DATA": "02.11.2026",
                 "DZIEŃ PRACUJĄCY/WOLNY": "Pracujący",
+                "NIEOBECNOŚĆ": "Brak",
+                "FAKTYCZNIE WEJŚCIE": "08:00",
+                "FAKTYCZNIE WYJŚCIE": "16:00",
             }]),
             "metrics": {
                 "pcs": 100, "lines": 10, "weight": 500,
@@ -96,6 +99,24 @@ class TestMonthlyPublication(unittest.TestCase):
             self.archive["metrics"]["pcs"] = invalid
             with self.assertRaises(PublicationValidationError):
                 prepare_publication("Listopad 2026", self.archive, self.profiles)
+
+    def test_no_presence_without_actual_times(self):
+        self.archive["schedule"].loc[0, "FAKTYCZNIE WYJŚCIE"] = ""
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
+    def test_absence_is_not_attendance(self):
+        self.archive["schedule"].loc[0, "NIEOBECNOŚĆ"] = "CHOROBOWE"
+        self.archive["schedule"].loc[0, "FAKTYCZNIE WEJŚCIE"] = ""
+        self.archive["schedule"].loc[0, "FAKTYCZNIE WYJŚCIE"] = ""
+        self.archive["summary"].loc[0, "Dni przepracowane"] = 0
+        period, _, rows = prepare_publication("Listopad 2026", self.archive, self.profiles)
+        self.assertEqual((period, rows[0]["attended_days"]), ("2026-11-01", 0))
+
+    def test_forged_worked_days_rejected(self):
+        self.archive["summary"].loc[0, "Dni przepracowane"] = 0
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
 
     def test_unrecognized_month(self):
         with self.assertRaises(PublicationValidationError):
