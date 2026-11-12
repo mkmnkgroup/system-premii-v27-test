@@ -95,7 +95,7 @@ begin
     if v_name is null or length(v_name) > 150 then
       raise exception 'INVALID_EMPLOYEE_NAME';
     end if;
-    select count(*), max(p.user_id) into v_matches, v_user
+    select count(*), (array_agg(p.user_id))[1] into v_matches, v_user
     from public.app_user_profiles p
     where p.enabled = true and p.role in ('admin','manager','employee')
       and p.employee_id is not null
