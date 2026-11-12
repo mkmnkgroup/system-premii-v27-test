@@ -130,6 +130,11 @@ def render_schedule_draft(year, month, display_period):
             st.error("Niekompletny zapis harmonogramu.")
             return
         st.session_state.current_schedule_df = frame
+        # Bump editor identity so the previous session's cell edits cannot
+        # silently override the restored database values on the next rerun.
+        st.session_state["_test_schedule_editor_generation"] = (
+            st.session_state.get("_test_schedule_editor_generation", 0) + 1
+        )
         st.session_state.schedule_period_key = display_period
         st.session_state[slot] = result["revision"]
         st.success("Przywrócono zapisany harmonogram. Zmiany nie zostały opublikowane pracownikom.")
@@ -189,9 +194,19 @@ def render_archive_draft():
         if not isinstance(payload, dict) or payload.get("format_version") != 1:
             st.error("Nieobsługiwany format zapisanego archiwum.")
             return
-        archive = _decode(payload.get("archive"))
-        if not isinstance(archive, dict):
-            st.error("Zapisane archiwum jest nieprawidłowe.")
+        try:
+            archive = _decode(payload.get("archive"))
+        except (TypeError, ValueError, KeyError):
+            st.error("Zapisane archiwum jest uszkodzone; nie nadpisano danych lokalnych.")
+            return
+        if not isinstance(archive, dict) or any(
+            not isinstance(period, str) or not isinstance(record, dict)
+            or not isinstance(record.get("summary"), pd.DataFrame)
+            or not isinstance(record.get("schedule"), pd.DataFrame)
+            or not isinstance(record.get("metrics"), dict)
+            for period, record in archive.items()
+        ):
+            st.error("Zapisane archiwum jest nieprawidłowe; nie zmieniono bieżących danych.")
             return
         st.session_state.history_v2 = archive
         st.session_state[slot] = result["revision"]
