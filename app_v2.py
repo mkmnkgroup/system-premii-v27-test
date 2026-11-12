@@ -1157,6 +1157,8 @@ if selected_module == "Harmonogram":
   from attendance_drafts import render_attendance_draft
   render_schedule_draft(gen_year, gen_month_idx, period_key)
   render_attendance_draft(gen_year, gen_month_idx, period_key)
+  from attendance_publication_ui import render_attendance_publication
+  render_attendance_publication(gen_year, gen_month_idx)
 
 # ==========================================
 # ZAKŁADKA 2: KALKULATOR PREMII
