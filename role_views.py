@@ -158,12 +158,12 @@ def _my_attendance(year, month, user_id):
         "v27_test_attendance",
         filters={"user_id": "eq." + user_id,
                  "work_day": "gte." + prefix + "01"},
-        columns="work_day,status,planned_hours,worked_hours",
+        columns="work_day,status,absence_label,time_in,time_out,overtime_h",
         limit=40,
     )
     if rows is not None:
         rows = [r for r in rows if str(r.get("work_day", "")).startswith(prefix)]
-    _show_table(rows, ["work_day", "status", "planned_hours", "worked_hours"])
+    _show_table(rows, ["work_day", "status", "absence_label", "time_in", "time_out", "overtime_h"])
 
 
 def _director_comparison(year, month):
@@ -229,8 +229,8 @@ def render_role_dashboard(role, user_id):
                 _show_table(rows, ["user_id", "period", "bonus_final_pln", "absence_reduction_pct"])
             elif section == "obecnosc":
                 rows = _get("v27_test_attendance", filters={"work_day": "gte.%04d-%02d-01" % (year, month)},
-                            columns="user_id,work_day,status,worked_hours")
+                            columns="user_id,work_day,status,absence_label,time_in,time_out,overtime_h")
                 if rows is not None:
                     rows = [r for r in rows if str(r.get("work_day", "")).startswith("%04d-%02d-" % (year, month))]
-                _show_table(rows, ["user_id", "work_day", "status", "worked_hours"])
+                _show_table(rows, ["user_id", "work_day", "status", "absence_label", "time_in", "time_out", "overtime_h"])
     st.stop()
