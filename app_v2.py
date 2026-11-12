@@ -1144,7 +1144,9 @@ if selected_module == "Harmonogram":
       },
       use_container_width=True,
       num_rows="fixed",
-      key="main_schedule_table_editor",
+      key="main_schedule_table_editor_" + str(
+          st.session_state.get("_test_schedule_editor_generation", 0)
+      ),
   )
 
   if isinstance(edited_df, pd.DataFrame):
