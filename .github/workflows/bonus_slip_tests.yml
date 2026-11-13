@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "bonus_components.py"
+      - "bonus_slip_pdf.py"
+      - "bonus_input_form.py"
+      - "bonus_analysis_cache.py"
+      - "tests/test_bonus_slip_generator.py"
       - "payslip_pdf.py"
       - "role_views.py"
       - "monthly_publication.py"
@@ -35,8 +39,9 @@ jobs:
           python -m pip install "fpdf2>=2.8,<3" "pypdf>=5,<7" "streamlit==1.66.0" "pandas>=2.2,<3" "requests>=2.31,<3"
       - name: Run payroll slip regression tests
         run: |
+          python -m unittest discover -s tests -p "test_bonus_slip_generator.py" -v
           python -m unittest discover -s tests -p "test_bonus_components.py" -v
           python -m unittest discover -s tests -p "test_payslip_pdf.py" -v
           python -m unittest discover -s tests -p "test_role_views.py" -v
           python -m unittest discover -s tests -p "test_monthly_publication.py" -v
-          python -m py_compile app_v2.py month_publication_ui.py monthly_publication.py
+          python -m py_compile app_v2.py month_publication_ui.py monthly_publication.py bonus_input_form.py bonus_analysis_cache.py bonus_slip_pdf.py
