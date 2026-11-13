@@ -1722,9 +1722,6 @@ def _render_calculator_tab():
             use_container_width=True,
         )
 
-      _safe_name = escape(str(e_name))
-      _safe_position = escape(str(e_det["position"]))
-
       # Native Streamlit components avoid split HTML containers, improve
       # accessibility and keep each earned amount individually auditable.
       with st.container(border=True):
