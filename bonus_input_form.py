@@ -42,7 +42,23 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
 
     store = st.session_state.setdefault("_bonus_inputs_by_period", {})
     if period not in store:
-        store[period] = _initial_snapshot(people, default_pallets)
+        snapshot = _initial_snapshot(people, default_pallets)
+        if not store:
+            # Preserve inputs already entered in the earlier unbatched UI
+            # when the new form is first deployed during an active session.
+            legacy_forklift = st.session_state.get("forklift_hours_df")
+            if isinstance(legacy_forklift, pd.DataFrame) and {
+                "OSOBA", "CZAS WÓZKA (godz.)"
+            }.issubset(legacy_forklift.columns):
+                snapshot["forklift"] = legacy_forklift[
+                    ["OSOBA", "CZAS WÓZKA (godz.)"]
+                ].copy()
+            legacy_special = st.session_state.get("special_bonuses_df")
+            if isinstance(legacy_special, pd.DataFrame) and set(
+                snapshot["specials"].columns
+            ).issubset(legacy_special.columns):
+                snapshot["specials"] = legacy_special.copy()
+        store[period] = snapshot
     saved = store[period]
 
     # Synchronize the calculator with the selected month's committed inputs.
