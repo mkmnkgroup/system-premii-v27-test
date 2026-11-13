@@ -73,6 +73,87 @@ class TestMonthlyPublication(unittest.TestCase):
         with self.assertRaises(PublicationValidationError):
             prepare_publication("Listopad 2026", self.archive, self.profiles)
 
+    def _add_complete_breakdown(self):
+        self.archive["summary"]["Nadgodziny (godz.)"] = 0.8
+        self.archive["schedule"]["NADGODZINY (godz.)"] = 0.8
+        return {
+            self.name: {
+                "base_bonus_pln": "150.00",
+                "overtime_rate_pln": "25.00",
+                "forklift_pay_pln": "10.00",
+                "forklift_hours": "2.00",
+                "forklift_team_hours": "10.00",
+                "forklift_pool_pln": "50.00",
+                "pallet_pay_pln": "15.00",
+                "pallet_count": "30.00",
+                "pallet_rate_pln": "1.00",
+                "pallet_recipients": 2,
+                "special_bonuses": [
+                    {"amount_pln": "5.00", "reason": "Zadanie testowe",
+                     "approved_by": "Kierownik testowy"}
+                ],
+            }
+        }
+
+    def test_publishes_detailed_components_without_double_counting(self):
+        self.archive["bonus_breakdowns"] = self._add_complete_breakdown()
+        _, _, rows = prepare_publication(
+            "Listopad 2026", self.archive, self.profiles
+        )
+        self.assertEqual(rows[0]["bonus_base_pln"], "150.00")
+        self.assertEqual(rows[0]["bonus_breakdown"]["pallet_pay_pln"], "15.00")
+        self.assertEqual(rows[0]["bonus_breakdown"]["special_bonuses"][0]["reason"],
+                         "Zadanie testowe")
+        self.assertEqual(rows[0]["bonus_additions_pln"], "50.00")
+        self.assertEqual(rows[0]["bonus_final_pln"], "200.00")
+
+    def test_rejects_mismatched_or_missing_breakdown(self):
+        breakdowns = self._add_complete_breakdown()
+        breakdowns[self.name]["pallet_pay_pln"] = "17.00"
+        self.archive["bonus_breakdowns"] = breakdowns
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+        self.archive["bonus_breakdowns"] = {}
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
+    def test_rejects_breakdown_with_unknown_employee(self):
+        breakdowns = self._add_complete_breakdown()
+        breakdowns["OBCY PRACOWNIK"] = dict(breakdowns[self.name])
+        self.archive["bonus_breakdowns"] = breakdowns
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
+    def test_snapshot_validates_calculator_components(self):
+        from monthly_publication import snapshot_bonus_breakdowns
+        summary = self.archive["summary"].copy()
+        summary["Nadgodziny (godz.)"] = 0.8
+        details = {
+            self.name: {
+                "base_emp_bonus": 150,
+                "calculated_bonus": 150,
+                "ot_rate": 25,
+                "emp_forklift_hours": 2,
+                "total_forklift_hours": 10,
+                "forklift_pool": 50,
+                "forklift_pay": 10,
+                "pallet_pay": 15,
+                "pallet_count": 30,
+                "pallet_rate": 1,
+                "pallet_recipients": 2,
+                "spec_bonus_items": [
+                    {"amount": 5, "reason": "Zadanie testowe",
+                     "approved_by": "Kierownik testowy"}
+                ],
+            }
+        }
+        result = snapshot_bonus_breakdowns(summary, details)
+        self.assertEqual(result[self.name]["base_bonus_pln"], "150.00")
+        self.assertEqual(result[self.name]["special_bonuses"][0]["amount_pln"], "5.00")
+        details[self.name]["pallet_pay"] = 16
+        with self.assertRaises(PublicationValidationError):
+            snapshot_bonus_breakdowns(summary, details)
+
     def test_unknown_account_does_not_publish(self):
         with self.assertRaises(PublicationValidationError):
             prepare_publication("Listopad 2026", self.archive, [])
