@@ -73,6 +73,47 @@ class TestMonthlyPublication(unittest.TestCase):
         with self.assertRaises(PublicationValidationError):
             prepare_publication("Listopad 2026", self.archive, self.profiles)
 
+    def test_full_itemized_breakdown_and_special_reasons(self):
+        self.archive["summary"]["Nadgodziny (godz.)"] = 0.8
+        self.archive["summary"]["Nadgodziny (stawka zł/h)"] = 25
+        self.archive["summary"]["Czas wózka (h)"] = 2
+        self.archive["schedule"]["NADGODZINY (godz.)"] = 0.8
+        self.archive["metrics"].update({
+            "pallets": 3, "pallet_rate_pln": 5, "pallet_recipient_count": 1
+        })
+        self.archive["special_bonuses"] = pd.DataFrame([{
+            "Pracownik": self.name, "Kwota netto premii": 5,
+            "Powód przyznania premii": "Awaryjny rozładunek",
+            "Kto przyznał": "Kierownik",
+        }])
+        _, _, rows = prepare_publication("Listopad 2026", self.archive, self.profiles)
+        item = rows[0]
+        self.assertEqual(item["overtime_rate_pln"], "25.00")
+        self.assertEqual(item["forklift_hours"], "2.00")
+        self.assertEqual(item["forklift_pay_pln"], "10.00")
+        self.assertEqual(item["pallet_team_count"], "3.00")
+        self.assertEqual(item["pallet_rate_pln"], "5.00")
+        self.assertEqual(item["pallet_pay_pln"], "15.00")
+        self.assertEqual(item["special_pay_pln"], "5.00")
+        self.assertEqual(item["special_details"][0]["reason"], "Awaryjny rozładunek")
+        self.assertEqual(item["bonus_final_pln"], "200.00")
+
+    def test_pallet_total_mismatch_rejected(self):
+        self.archive["metrics"].update({
+            "pallets": 2, "pallet_rate_pln": 5, "pallet_recipient_count": 1
+        })
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
+    def test_special_justification_mismatch_rejected(self):
+        self.archive["special_bonuses"] = pd.DataFrame([{
+            "Pracownik": self.name, "Kwota netto premii": 4,
+            "Powód przyznania premii": "Dodatkowe zadania",
+            "Kto przyznał": "",
+        }])
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
     def test_unknown_account_does_not_publish(self):
         with self.assertRaises(PublicationValidationError):
             prepare_publication("Listopad 2026", self.archive, [])
