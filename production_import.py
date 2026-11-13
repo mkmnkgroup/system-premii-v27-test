@@ -1,5 +1,6 @@
 """Safe preparation of production KPIs from a current monthly export and weight catalog."""
 import io
+import re
 import pandas as pd
 from client_categories import CLIENT_CATEGORY_COLUMN, exclude_categories
 
@@ -7,6 +8,14 @@ BRAND = "Наименование ТМ запчасти"
 ARTICLE = "Каталожный номер отформатированный"
 QTY = "Количество штук в строке заказа"
 DATE = "Дата перехода в искомое состояние"
+
+
+def parse_production_dates(values):
+    """Preserve ISO year-month-day order while accepting local day-first dates."""
+    def parse(value):
+        iso = isinstance(value, str) and bool(re.match(r'^\s*\d{4}-\d{2}-\d{2}(?:[ T]|$)', value))
+        return pd.to_datetime(value, dayfirst=not iso, errors="coerce")
+    return values.map(parse)
 
 
 def normalize(value):

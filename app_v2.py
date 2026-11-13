@@ -1369,7 +1369,8 @@ def _render_calculator_tab():
     if _DATE not in daily_source.columns:
       st.error("W zaimportowanych danych nie ma kolumny daty przejścia. Wgraj raport ponownie; jeśli problem pozostanie, sprawdź nagłówek: " + _DATE)
       return
-    daily_source["_date"] = pd.to_datetime(daily_source[_DATE], dayfirst=True, errors="coerce")
+    from production_import import parse_production_dates
+    daily_source["_date"] = parse_production_dates(daily_source[_DATE])
     _invalid_dates = int(daily_source["_date"].isna().sum())
     _outside = int((daily_source["_date"].notna() & ((daily_source["_date"].dt.year != gen_year) | (daily_source["_date"].dt.month != gen_month_idx))).sum())
     if _invalid_dates or _outside:
