@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 import unicodedata
 
+from bonus_components import parse_bonus_breakdown
+
 MONTHS = ("", "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
           "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień")
 FONTS = Path(__file__).parent / "assets" / "fonts"
@@ -30,6 +32,81 @@ def payslip_filename(period, employee_name):
     return f"pasek_premiowy_{date.fromisoformat(period):%Y-%m}_{slug}.pdf"
 
 
+def _add_breakdown_page(pdf, components):
+    """Append a verifiable detail page to an already validated payslip."""
+    pdf.add_page()
+    pdf.set_auto_page_break(True, margin=22)
+    navy, muted = (24, 43, 61), (94, 110, 123)
+
+    pdf.set_xy(20, 24)
+    pdf.set_font("DejaVu", "B", 17)
+    pdf.set_text_color(*navy)
+    pdf.multi_cell(170, 9, "Szczegóły naliczenia dodatków")
+    pdf.ln(2)
+    pdf.set_x(20)
+    pdf.set_font("DejaVu", "", 9)
+    pdf.set_text_color(*muted)
+    pdf.multi_cell(170, 6, "Kwoty z zatwierdzonego rozliczenia. Ta strona nie zwiększa kwoty z podsumowania.")
+    pdf.ln(5)
+
+    def item(label, amount, note=None):
+        pdf.set_font("DejaVu", "", 9)
+        pdf.set_text_color(*navy)
+        y = pdf.get_y()
+        pdf.set_x(20)
+        pdf.multi_cell(112, 6, str(label))
+        next_y = pdf.get_y()
+        pdf.set_xy(138, y)
+        pdf.set_font("DejaVu", "B", 9)
+        pdf.cell(52, 6, _pl(amount) + " zł", align="R")
+        pdf.set_y(max(next_y, y + 6))
+        if note:
+            pdf.set_x(20)
+            pdf.set_font("DejaVu", "", 8)
+            pdf.set_text_color(*muted)
+            pdf.multi_cell(170, 5, str(note))
+        pdf.ln(3)
+
+    overtime_note = None
+    if components["overtime_rate"] is not None and components["overtime_hours"] is not None:
+        overtime_note = (
+            f'{_pl(components["overtime_hours"])} godz. x '
+            f'{_pl(components["overtime_rate"])} zł/godz.'
+        )
+    item("Nadgodziny", components["overtime_pay"], overtime_note)
+
+    forklift_note = None
+    if components["forklift_hours"] is not None and components["forklift_team_hours"] is not None:
+        forklift_note = (
+            f'{_pl(components["forklift_hours"])} godz. / '
+            f'{_pl(components["forklift_team_hours"])} godz. zespołu'
+        )
+        if components["forklift_pool"] is not None:
+            forklift_note += f' | pula {_pl(components["forklift_pool"])} zł'
+    item("Dodatek za obsługę wózka widłowego", components["forklift_pay"], forklift_note)
+
+    pallet_note = None
+    if (components["pallet_count"] is not None and
+            components["pallet_rate"] is not None and components["pallet_recipients"]):
+        pallet_note = (
+            f'{_pl(components["pallet_count"])} palet x '
+            f'{_pl(components["pallet_rate"])} zł / '
+            f'{components["pallet_recipients"]} osób'
+        )
+    item("Dodatek za rozładunek i załadunek palet", components["pallet_pay"], pallet_note)
+
+    for bonus in components["special_bonuses"]:
+        note = ("Przyznał: " + bonus["approved_by"]) if bonus["approved_by"] else None
+        item("Premia specjalna: " + bonus["reason"], bonus["amount"], note)
+
+    pdf.ln(4)
+    pdf.set_x(20)
+    pdf.set_font("DejaVu", "B", 11)
+    pdf.set_text_color(*navy)
+    pdf.cell(110, 8, "Suma dodatków (z nadgodzinami)")
+    pdf.cell(60, 8, _pl(components["additions_total"]) + " zł", align="R")
+
+
 def build_payslip_pdf(period, employee_name, row):
     from fpdf import FPDF
 
@@ -52,6 +129,8 @@ def build_payslip_pdf(period, employee_name, row):
             or not 0 <= attended <= planned <= 31 or reduction > 100
             or main + additions != total):
         raise ValueError("Niespójne dane w opublikowanym rozliczeniu.")
+
+    details = parse_bonus_breakdown(row)
 
     pdf = FPDF(format="A4")
     pdf.add_font("DejaVu", "", str(FONTS / "DejaVuSans.ttf"))
@@ -94,7 +173,7 @@ def build_payslip_pdf(period, employee_name, row):
     overtime_label = "Nadgodziny" + (f" ({_pl(hours)} h)" if hours is not None else " (brak liczby godzin)")
     components = [("Premia po uwzględnieniu obecności", main),
                   (overtime_label, overtime),
-                  ("Pozostałe dodatki" if overtime is not None else "Dodatki łącznie", additions - overtime if overtime is not None else additions)]
+                  ("Pozostałe dodatki (szczegóły na str. 2)" if details is not None else "Pozostałe dodatki" if overtime is not None else "Dodatki łącznie", additions - overtime if overtime is not None else additions)]
     for label, value in components:
         text(20, y, label, 10)
         text(130, y, _pl(value) + " zł" if value is not None else "Brak danych", 12, True, width=60, align="R")
@@ -114,4 +193,6 @@ def build_payslip_pdf(period, employee_name, row):
     pdf.line(20, 282, 190, 282)
     text(20, 285, "WERSJA TESTOWA  |  Dokument informacyjny - nie stanowi dokumentu płacowego.",
          8, color=muted)
+    if details is not None:
+        _add_breakdown_page(pdf, details)
     return bytes(pdf.output())
