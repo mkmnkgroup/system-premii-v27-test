@@ -1476,158 +1476,18 @@ def _render_calculator_tab():
       fig_daily.update_traces(marker_color="#1e3a8a")
       st.plotly_chart(fig_daily, use_container_width=True)
 
-    # EWIDENCJA WÓZKA
-    st.markdown("---")
-    with st.container(border=True):
-      st.subheader(
-          "🚜 3. Ewidencja Czasu Pracy na Wózku Widłowym (z Książki Obsługi)"
-      )
-      st.markdown(
-          "Wpisz poniżej liczbę godzin obsługi wózka dla każdego z pracowników"
-          " w tym miesiącu. System automatycznie wyliczy 100% czasu obsługi"
-          f" w zespole i podzieli pulę **{st.session_state.forklift_pool:,.2f}"
-          " zł netto**."
-      )
-
-      emp_list_df = st.session_state.employees_df[
-          ["OSOBA", "UPRAWNIENIA UDT"]
-      ].copy()
-      merged_forklift = pd.merge(
-          emp_list_df, st.session_state.forklift_hours_df, on="OSOBA", how="left"
-      ).fillna({"CZAS WÓZKA (godz.)": 0.0})
-
-      forklift_editor_df = st.data_editor(
-          merged_forklift,
-          column_config={
-              "OSOBA": st.column_config.TextColumn("Pracownik", disabled=True),
-              "UPRAWNIENIA UDT": st.column_config.CheckboxColumn(
-                  "Uprawnienia UDT", disabled=True
-              ),
-              "CZAS WÓZKA (godz.)": st.column_config.NumberColumn(
-                  "Liczba godzin na wózku (h)",
-                  min_value=0.0,
-                  max_value=300.0,
-                  step=0.5,
-              ),
-          },
-          use_container_width=True,
-          hide_index=True,
-          key="forklift_hours_editor",
-      )
-
-      if isinstance(forklift_editor_df, pd.DataFrame):
-        st.session_state.forklift_hours_df = forklift_editor_df[
-            ["OSOBA", "CZAS WÓZKA (godz.)"]
-        ]
-
-      total_forklift_hours = pd.to_numeric(
-          st.session_state.forklift_hours_df["CZAS WÓZKA (godz.)"],
-          errors="coerce",
-      ).sum()
-
-      col_fk1, col_fk2 = st.columns(2)
-      with col_fk1:
-        st.metric(
-            label="Łączny Czas Obsługi Wózka w Zespole (100%)",
-            value=f"{total_forklift_hours:.1f} godz.",
-        )
-      with col_fk2:
-        st.metric(
-            label="Zbiorcza Pula za Wózki do Podziału",
-            value=f"{st.session_state.forklift_pool:,.2f} zł netto",
-        )
-
-    # PODZIAŁ PALET
-    st.markdown("---")
-    with st.container(border=True):
-      st.subheader("📦 4. Podział Premii za Rozładunki / Załadunki Palet")
-
-      unique_emps = (
-          st.session_state.employees_df["OSOBA"].dropna().unique().tolist()
-      )
-
-      col_pal1, col_pal2, col_pal3 = st.columns(3)
-      with col_pal1:
-        manual_pallets = st.number_input(
-            "Liczba palet w miesiącu:",
-            value=float(cur_pallets),
-            min_value=0.0,
-            step=1.0,
-        )
-
-      total_pallet_pool = manual_pallets * st.session_state.rate_pallet
-
-      with col_pal2:
-        st.metric(
-            label="Łączna Pula za Palety (netto)",
-            value=f"{total_pallet_pool:,.2f} zł",
-        )
-      with col_pal3:
-        st.metric(
-            label="Stawka za 1 szt. palety",
-            value=f"{st.session_state.rate_pallet:,.2f} zł",
-        )
-
-      selected_pallet_emps = st.multiselect(
-          "Zaznacz pracowników uwzględnionych w podziale premii za palety:",
-          options=unique_emps,
-          default=unique_emps,
-          key="pallet_emp_multiselect",
-      )
-
-      num_selected_pallet_emps = len(selected_pallet_emps)
-      pallet_pay_per_selected_emp = (
-          (total_pallet_pool / num_selected_pallet_emps)
-          if num_selected_pallet_emps > 0
-          else 0.0
-      )
-
-      if num_selected_pallet_emps > 0:
-        st.success(
-            f"Pula **{total_pallet_pool:,.2f} zł** dzielona jest na"
-            f" **{num_selected_pallet_emps}** wybranych pracowników ("
-            f"**{pallet_pay_per_selected_emp:,.2f} zł netto** na osobę)."
-        )
-      else:
-        st.warning(
-            "Nie zaznaczono żadnego pracownika do podziału premii za palety."
-        )
-
-    # PREMIA SPECJALNA / UZNANIOWA
-    st.markdown("---")
-    with st.container(border=True):
-      st.subheader("⭐ 5. Premie Specjalne i Uznaniowe")
-      st.markdown(
-          "Wprowadź poniżej ewentualne dodatkowe premie specjalne przyznane"
-          " pracownikom w danym miesiącu. Możesz dodawać dowolną liczbę"
-          " wierszy."
-      )
-
-      edited_spec_bonuses = st.data_editor(
-          st.session_state.special_bonuses_df,
-          column_config={
-              "Pracownik": st.column_config.SelectboxColumn(
-                  "Pracownik", options=unique_emps, required=True
-              ),
-              "Kwota netto premii": st.column_config.NumberColumn(
-                  "Kwota netto (zł)",
-                  min_value=0.0,
-                  step=50.0,
-                  format="%.2f zł",
-              ),
-              "Powód przyznania premii": st.column_config.TextColumn(
-                  "Za co przyznana / Powód"
-              ),
-              "Kto przyznał": st.column_config.TextColumn("Kto przyznał"),
-          },
-          num_rows="dynamic",
-          use_container_width=True,
-          hide_index=True,
-          key="special_bonuses_editor",
-      )
-
-      if isinstance(edited_spec_bonuses, pd.DataFrame):
-        st.session_state.special_bonuses_df = edited_spec_bonuses
+    # Formularz zbiorczy: dopiero zatwierdzenie przelicza dane dodatków.
+    from bonus_input_form import render_bonus_inputs
+    unique_emps = (
+        st.session_state.employees_df["OSOBA"].dropna().unique().tolist()
+    )
+    manual_pallets, selected_pallet_emps, total_forklift_hours, pallet_pay_per_selected_emp = render_bonus_inputs(
+        st.session_state.employees_df,
+        period_key,
+        cur_pallets,
+        st.session_state.forklift_pool,
+        st.session_state.rate_pallet,
+    )
 
     # PRZEŁĄCZNIK WARIANTU ROZLICZENIA FREKWENCYJNEGO
     st.markdown("---")
