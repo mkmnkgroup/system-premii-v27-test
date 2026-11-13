@@ -183,6 +183,13 @@ def build_payslip_pdf(period, employee_name, row):
     text(100, y + 9, _pl(total) + " zł netto", 20, True,
          (255, 255, 255), width=84, align="R")
 
+    def footer():
+        pdf.set_draw_color(223, 230, 234)
+        pdf.line(20, 282, 190, 282)
+        text(20, 285, "WERSJA TESTOWA  |  Dokument informacyjny - nie stanowi dokumentu płacowego.",
+             8, color=muted)
+
+    footer()
     extra = detailed and any(v is not None for v in (
         overtime_rate, forklift_hours, forklift_total, pallet_total,
         pallet_rate, recipients, special_details,
@@ -199,6 +206,7 @@ def build_payslip_pdf(period, employee_name, row):
         def explanation(label, description):
             nonlocal cursor
             if cursor > 252:
+                footer()
                 pdf.add_page()
                 cursor = 27
             text(20, cursor, label, 10, True)
@@ -238,11 +246,6 @@ def build_payslip_pdf(period, employee_name, row):
         text(20, 273, "Szczegóły odpowiadają wyłącznie opublikowanemu rozliczeniu pracownika.",
              8, color=muted)
 
-    pdf.set_draw_color(223, 230, 234)
-    # Footer of every page (last detail page gets its own standard note).
-    for page in range(1, pdf.pages_count + 1):
-        pdf.page = page
-        pdf.line(20, 282, 190, 282)
-        text(20, 285, "WERSJA TESTOWA  |  Dokument informacyjny - nie stanowi dokumentu płacowego.",
-             8, color=muted)
+    if extra:
+        footer()
     return bytes(pdf.output())
