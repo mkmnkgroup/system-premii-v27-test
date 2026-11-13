@@ -80,6 +80,14 @@ def render_month_publication(label, archived_period):
         )
         return
 
+    if any(row.get("bonus_breakdown") is None for row in rows):
+        st.warning(
+            "Ten zapis archiwalny nie zawiera szczegółowych składników premii. "
+            "Aby pracownicy mogli zweryfikować wszystkie dodatki, otwórz kalkulator "
+            "i zapisz rozliczenie ponownie. Publikacja niepełnego paska została zablokowana."
+        )
+        return
+
     st.markdown("**Zbiorcze wskaźniki za okres**")
     c1, c2, c3 = st.columns(3)
     c1.metric("Pozycje", kpis["positions"])
@@ -97,9 +105,26 @@ def render_month_publication(label, archived_period):
         "Dodatki (zł)": row["bonus_additions_pln"],
         "Nadgodziny (h)": row["overtime_hours"],
         "Za nadgodziny (zł)": row["overtime_pay_pln"],
+        "Wózek (zł)": row["bonus_breakdown"]["forklift_pay_pln"],
+        "Palety (zł)": row["bonus_breakdown"]["pallet_pay_pln"],
+        "Specjalne (zł)": str(sum(
+            (pd.to_numeric(item["amount_pln"]) for item in
+             row["bonus_breakdown"]["special_bonuses"]), 0
+        )),
+        "Premia bazowa (zł)": row["bonus_base_pln"],
         "Łącznie (zł)": row["bonus_final_pln"],
     } for row in rows])
     st.dataframe(table, hide_index=True, width="stretch")
+    for row in rows:
+        special = row["bonus_breakdown"]["special_bonuses"]
+        if special:
+            with st.expander("Premie specjalne — " + row["employee_name"]):
+                for bonus in special:
+                    st.write(
+                        f'{bonus["amount_pln"]} zł — {bonus["reason"]}'
+                        + (f' (przyznał: {bonus["approved_by"]})' if bonus.get("approved_by") else "")
+                    )
+
     st.caption(
         "Archiwum nie zawiera potwierdzonych indywidualnych wyników "
         "pozycji/sztuk/masy. Nie zostaną one wymyślone ani wpisane jako zero. "
