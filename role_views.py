@@ -142,13 +142,39 @@ def _my_payslip(period, user_id):
         st.info("Twój pasek premiowy za ten okres nie został jeszcze opublikowany.")
     else:
         row = rows[0]
+        if row.get("user_id") != user_id:
+            st.error("Nie można potwierdzić właściciela rozliczenia.")
+            return
         c1, c2 = st.columns(2)
         c1.metric("Premia główna (PLN)", row.get("bonus_main_pln", "—"))
         c2.metric("Dodatki (PLN)", row.get("bonus_additions_pln", "—"))
         st.metric("Premia końcowa (PLN)", row.get("bonus_final_pln", "—"))
         st.caption("Potrącenie za nieobecności: " + str(row.get("absence_reduction_pct", "—")) + "%")
-        st.caption("Wydanie PDF · System Premii 2.7 TEST · 13.11.2026. Nie stanowi dokumentu płacowego.")
+        st.caption("System Premii 2.7 TEST · Dokument informacyjny, nie stanowi dokumentu płacowego.")
         _overtime_metrics(row)
+        from bonus_components import parse_bonus_breakdown
+        try:
+            breakdown = parse_bonus_breakdown(row)
+        except ValueError:
+            st.error("Opublikowane szczegóły dodatków są niespójne. Skontaktuj się z administratorem.")
+            return
+        if breakdown is None:
+            st.info("Szczegółowy podział dodatków nie został jeszcze opublikowany dla tego miesiąca. PDF pokazuje dostępne kwoty zbiorcze.")
+        else:
+            st.markdown("#### Szczegółowe składniki dodatków")
+            entries = [
+                {"Składnik": "Nadgodziny", "Kwota (zł)": float(breakdown["overtime_pay"])},
+                {"Składnik": "Wózek widłowy", "Kwota (zł)": float(breakdown["forklift_pay"])},
+                {"Składnik": "Rozładunki i załadunki palet", "Kwota (zł)": float(breakdown["pallet_pay"])},
+            ]
+            for item in breakdown["special_bonuses"]:
+                entries.append({
+                    "Składnik": "Premia specjalna: " + item["reason"],
+                    "Kwota (zł)": float(item["amount"]),
+                })
+            st.dataframe(pd.DataFrame(entries), hide_index=True, use_container_width=True)
+            st.caption("Suma powyższych składników: " + str(breakdown["additions_total"]) + " zł. Kwoty są już ujęte w łącznej premii.")
+            st.caption("Wygenerowany PDF zawiera również dostępne stawki, godziny i zasady podziału dodatków.")
         profiles = _get("app_user_profiles", filters={"user_id": "eq." + user_id},
                         columns="user_id,employee_id,display_name", limit=1)
         if (not profiles or len(profiles) != 1
