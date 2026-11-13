@@ -74,7 +74,7 @@ class BonusBreakdownTests(unittest.TestCase):
         self.assertEqual(len(reader.pages), 2)
         first, second = (page.extract_text() for page in reader.pages)
         self.assertIn("730,00 zł netto", first)
-        self.assertIn("Wózek", second.lower().capitalize() if False else second)
+        self.assertIn("wózka widłowego", second)
         self.assertIn("Dodatkowe zadanie", second)
         self.assertIn("230,00 zł", second)
 
