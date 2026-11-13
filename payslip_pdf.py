@@ -205,7 +205,7 @@ def build_payslip_pdf(period, employee_name, row):
 
         def explanation(label, description):
             nonlocal cursor
-            if cursor > 252:
+            if cursor > 235:
                 footer()
                 pdf.add_page()
                 cursor = 27
@@ -243,8 +243,8 @@ def build_payslip_pdf(period, employee_name, row):
                                 reason + (f" (przyznał: {author})" if author else ""))
             else:
                 explanation("Premie specjalne", "Brak dodatkowych premii za ten miesiąc.")
-        text(20, 273, "Szczegóły odpowiadają wyłącznie opublikowanemu rozliczeniu pracownika.",
-             8, color=muted)
+        # Each explanation is bound to the employee's published row.
+        # The bottom margin is kept clear for the standard footer.
 
     if extra:
         footer()
