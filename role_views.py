@@ -121,7 +121,16 @@ def _my_month(period, user_id):
     a, b = st.columns(2)
     a.metric("Dni zaplanowane", row.get("planned_days", "—"))
     b.metric("Dni obecności", row.get("attended_days", "—"))
+    _overtime_metrics(row)
     return row
+
+
+def _overtime_metrics(row):
+    hours, pay = row.get("overtime_hours"), row.get("overtime_pay_pln")
+    a, b = st.columns(2)
+    a.metric("Nadgodziny (h)", hours if hours is not None else "Brak danych")
+    b.metric("Za nadgodziny (PLN)", pay if pay is not None else "Brak danych")
+    st.caption("Kwota za nadgodziny jest częścią dodatków i kwoty do wypłaty.")
 
 
 def _my_payslip(period, user_id):
@@ -139,16 +148,24 @@ def _my_payslip(period, user_id):
         st.metric("Premia końcowa (PLN)", row.get("bonus_final_pln", "—"))
         st.caption("Potrącenie za nieobecności: " + str(row.get("absence_reduction_pct", "—")) + "%")
         st.caption("Testowy pasek premiowy. Nie stanowi dokumentu płacowego.")
-        slip = (
-            f"TESTOWY PASEK PREMIOWY\nOkres: {period[:7]}\n"
-            f"Premia główna (PLN): {row.get('bonus_main_pln')}\n"
-            f"Dodatki (PLN): {row.get('bonus_additions_pln')}\n"
-            f"Korekta za nieobecności (%): {row.get('absence_reduction_pct')}\n"
-            f"Premia końcowa (PLN): {row.get('bonus_final_pln')}\n"
-        )
+        _overtime_metrics(row)
+        profiles = _get("app_user_profiles", filters={"user_id": "eq." + user_id},
+                        columns="user_id,employee_id,display_name", limit=1)
+        if (not profiles or len(profiles) != 1
+                or profiles[0].get("user_id") != user_id or row.get("user_id") != user_id):
+            st.warning("Nie można potwierdzić danych pracownika do pobrania PDF.")
+            return
+        name = profiles[0].get("employee_id") or profiles[0].get("display_name")
+        from payslip_pdf import build_payslip_pdf, payslip_filename
+        try:
+            slip = build_payslip_pdf(period, name, row)
+            filename = payslip_filename(period, name)
+        except (ValueError, OSError):
+            st.error("Nie można przygotować PDF. Sprawdź opublikowane rozliczenie.")
+            return
         st.download_button(
-            "Pobierz mój pasek (TXT)", slip,
-            file_name="test_pasek_" + period[:7] + ".txt", mime="text/plain",
+            "Pobierz mój pasek (PDF)", slip,
+            file_name=filename, mime="application/pdf",
             key="_employee_slip_download")
 
 

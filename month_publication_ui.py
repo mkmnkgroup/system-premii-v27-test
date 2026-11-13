@@ -95,6 +95,8 @@ def render_month_publication(label, archived_period):
              if u.get("user_id") == row["user_id"]), "Nieznane"),
         "Premia główna (zł)": row["bonus_main_pln"],
         "Dodatki (zł)": row["bonus_additions_pln"],
+        "Nadgodziny (h)": row["overtime_hours"],
+        "Za nadgodziny (zł)": row["overtime_pay_pln"],
         "Łącznie (zł)": row["bonus_final_pln"],
     } for row in rows])
     st.dataframe(table, hide_index=True, width="stretch")

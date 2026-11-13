@@ -159,6 +159,17 @@ def prepare_publication(label, archive, profiles):
         except AttendanceValidationError as exc:
             raise PublicationValidationError(f"Pracownik „{name}”: {exc}") from None
         planned = attendance["planned"]
+        overtime_pay = _decimal(source["Nadgodziny (zł)"], "kwota nadgodzin")
+        raw_hours = source.get("Nadgodziny (godz.)")
+        overtime_hours = None if raw_hours is None or pd.isna(raw_hours) else _decimal(raw_hours, "liczba nadgodzin")
+        if overtime_hours is not None:
+            if overtime_hours > 744 or (overtime_hours == 0 and overtime_pay > 0):
+                raise PublicationValidationError("Niespójne godziny i kwota nadgodzin.")
+            if "NADGODZINY (godz.)" in own_schedule.columns:
+                confirmed_hours = sum((_decimal(v, "nadgodziny w ewidencji")
+                                       for v in own_schedule["NADGODZINY (godz.)"]), Decimal("0"))
+                if overtime_hours != confirmed_hours:
+                    raise PublicationValidationError("Nadgodziny rozliczenia nie zgadzają się z ewidencją.")
         if planned > 31 or worked != attendance["confirmed"]:
             raise PublicationValidationError(
                 f"Nieprawidłowa liczba przepracowanych dni pracownika „{name}”: "
@@ -173,5 +184,7 @@ def prepare_publication(label, archive, profiles):
             "bonus_additions_pln": str(additions),
             "bonus_final_pln": str(total),
             "absence_reduction_pct": str(deduction),
+            "overtime_hours": str(overtime_hours) if overtime_hours is not None else None,
+            "overtime_pay_pln": str(overtime_pay),
         })
     return period, kpis, rows
