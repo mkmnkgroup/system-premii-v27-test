@@ -59,6 +59,20 @@ class TestMonthlyPublication(unittest.TestCase):
         self.assertEqual(rows[0]["bonus_final_pln"], "200.00")
         self.assertNotIn("positions", rows[0])
 
+    def test_overtime_hours_and_payment_survive_publication_preflight(self):
+        self.archive["summary"]["Nadgodziny (godz.)"] = 0.8
+        self.archive["schedule"]["NADGODZINY (godz.)"] = 0.8
+        _, _, rows = prepare_publication("Listopad 2026", self.archive, self.profiles)
+        self.assertEqual(rows[0]["overtime_hours"], "0.80")
+        self.assertEqual(rows[0]["overtime_pay_pln"], "20.00")
+        self.assertEqual(rows[0]["bonus_final_pln"], "200.00")
+
+    def test_conflicting_overtime_is_rejected(self):
+        self.archive["summary"]["Nadgodziny (godz.)"] = 2
+        self.archive["schedule"]["NADGODZINY (godz.)"] = 1
+        with self.assertRaises(PublicationValidationError):
+            prepare_publication("Listopad 2026", self.archive, self.profiles)
+
     def test_unknown_account_does_not_publish(self):
         with self.assertRaises(PublicationValidationError):
             prepare_publication("Listopad 2026", self.archive, [])
