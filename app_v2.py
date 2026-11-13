@@ -10,7 +10,6 @@ import json
 import re
 import hashlib
 import logging
-from html import escape
 import holidays
 import pandas as pd
 import streamlit as st
@@ -1726,89 +1725,112 @@ def _render_calculator_tab():
       _safe_name = escape(str(e_name))
       _safe_position = escape(str(e_det["position"]))
 
-      deduction_html_info = (
-          f'<p style="margin:3px 0; color:#dc2626;"><strong>Potrącenie za'
-          f' nieobecności:</strong> -{e_det["deduction_pct"]:.2f}%</p>'
-          if include_absence_deduction
-          else '<p style="margin:3px 0; color:#0284c7;"><strong>Wariant'
-          " premii:</strong> Bez potrąceń za nieobecności (100%)</p>"
-      )
+      # Native Streamlit components avoid split HTML containers, improve
+      # accessibility and keep each earned amount individually auditable.
+      with st.container(border=True):
+        st.markdown(f"#### Rozliczenie: {period_key}")
+        st.caption(f'Pracownik: {e_name}  ·  Stanowisko: {e_det["position"]}')
+        a, b, c = st.columns(3)
+        a.metric("Dni planowane", int(e_det["scheduled_days"]))
+        b.metric("Dni potwierdzone", int(e_det["days_worked"]))
+        c.metric("Dni nieobecności", int(e_det["absent_days"]))
 
-      st.markdown(
-          f"""
-            <div class="pay-slip">
-                <div class="pay-slip-header">
-                    <h3 style="margin:0; color:#1e3a8a;">PASEK ROZLICZENIA PREMIOWEGO — {period_key.upper()}</h3>
-                    <p style="margin:5px 0 0 0; font-size:16px;"><strong>Pracownik:</strong> {_safe_name} | <strong>Stanowisko:</strong> {_safe_position}</p>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                    <div>
-                        <p style="margin:3px 0;"><strong>Dni planowane:</strong> {e_det['scheduled_days']}</p>
-                        <p style="margin:3px 0;"><strong>Dni przepracowane:</strong> {e_det['days_worked']}</p>
-                        <p style="margin:3px 0;"><strong>Dni nieobecności:</strong> {e_det['absent_days']}</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="margin:3px 0;"><strong>Maks. premia bazowa:</strong> {e_det['base_emp_bonus']:,.2f} zł</p>
-                        {deduction_html_info}
-                        <p style="margin:3px 0; font-size:18px; color:#16a34a;"><strong>Premia produkcyjna po uwzględnieniu wariantu:</strong> {e_det['calculated_bonus']:,.2f} zł</p>
-                    </div>
-                </div>
-            """,
-          unsafe_allow_html=True,
-      )
-
-      st.markdown("**📅 Wykaz Dni Nieobecności:**")
-      abs_df_view = e_det["absences_table"]
-
-      if abs_df_view.empty:
-        if e_det["days_worked"] < e_det["scheduled_days"]:
+        if (e_det["days_worked"] + e_det["absent_days"]
+                < e_det["scheduled_days"]):
           st.warning(
-              "Brak zarejestrowanych nieobecności, ale część dni pracy "
-              "nie została jeszcze potwierdzona. Wariant bez potrąceń "
-              "nie oznacza 100% potwierdzonej frekwencji."
+              "Nie potwierdzono jeszcze wszystkich zaplanowanych dni pracy. "
+              "To rozliczenie jest robocze — przed publikacją należy "
+              "uzupełnić obecność lub nieobecność."
+          )
+        if include_absence_deduction:
+          st.caption(
+              f'Premia bazowa: {e_det["base_emp_bonus"]:,.2f} zł · '
+              f'Potrącenie za nieobecności: {e_det["deduction_pct"]:.2f}%'
           )
         else:
-          st.success("Brak zarejestrowanych nieobecności.")
-      else:
-        st.dataframe(
-            abs_df_view,
-            column_config={
-                "Udział pracy w miesiącu (%)": st.column_config.NumberColumn(
-                    format="%.2f %%"
-                )
+          st.caption(
+              f'Premia bazowa: {e_det["base_emp_bonus"]:,.2f} zł · '
+              "Wariant bez potrąceń za nieobecności (nie jest to potwierdzenie frekwencji)."
+          )
+
+        _ot_rate = float(e_det.get("ot_rate", 0.0))
+        _forklift_hours = float(e_det.get("emp_forklift_hours", 0.0))
+        _team_hours = float(e_det.get("total_forklift_hours", 0.0))
+        _pallet_count = float(e_det.get("pallet_count", 0.0))
+        _pallet_recipients = int(e_det.get("pallet_recipients", 0))
+        _pallet_rate = float(e_det.get("pallet_rate", 0.0))
+        _pallet_formula = (
+            f'{_pallet_count:.0f} palet × {_pallet_rate:.2f} zł ÷ {_pallet_recipients} osób'
+            if _pallet_recipients else "Nie uwzględniono w podziale"
+        )
+        _breakdown_rows = [
+            {
+                "Składnik": "Premia produkcyjna",
+                "Wyliczenie": (
+                    f'Bazowa {e_det["base_emp_bonus"]:,.2f} zł; '
+                    f'potrącenie {e_det["deduction_pct"]:.2f}%'
+                ),
+                "Kwota (zł)": float(e_det["calculated_bonus"]),
             },
-            use_container_width=True,
+            {
+                "Składnik": "Nadgodziny",
+                "Wyliczenie": f'{e_det["total_ot"]:.1f} h × {_ot_rate:.2f} zł/h',
+                "Kwota (zł)": float(e_det["ot_pay"]),
+            },
+            {
+                "Składnik": "Wózek widłowy",
+                "Wyliczenie": (
+                    f'{_forklift_hours:.1f} z {_team_hours:.1f} h zespołu; '
+                    f'udział {e_det["emp_forklift_pct"]:.2f}%'
+                ),
+                "Kwota (zł)": float(e_det["forklift_pay"]),
+            },
+            {
+                "Składnik": "Rozładunki i załadunki palet",
+                "Wyliczenie": _pallet_formula,
+                "Kwota (zł)": float(e_det["pallet_pay"]),
+            },
+        ]
+        for _item in e_det.get("spec_bonus_items", []):
+          _breakdown_rows.append({
+              "Składnik": "Premia specjalna",
+              "Wyliczenie": (
+                  str(_item.get("reason") or "Bez opisu")
+                  + (f' · przyznał: {_item["approved_by"]}' if _item.get("approved_by") else "")
+              ),
+              "Kwota (zł)": float(_item.get("amount", 0.0)),
+          })
+        st.dataframe(
+            pd.DataFrame(_breakdown_rows),
             hide_index=True,
+            use_container_width=True,
+            column_config={
+                "Kwota (zł)": st.column_config.NumberColumn(
+                    "Kwota (zł)", format="%.2f zł",
+                ),
+            },
         )
-
-      spec_details_html = ""
-      if e_det["spec_reasons_list"]:
-        spec_details_html = (
-            "<br><small style='color:#475569;'>Wykaz premii"
-            " specjalnych:<br>• "
-            + "<br>• ".join(escape(str(x)) for x in e_det["spec_reasons_list"])
-            + "</small>"
+        st.metric(
+            "Łączna kwota premii i dodatków",
+            f'{e_det["total_payout"]:,.2f} zł',
         )
+        st.caption("Suma nie obejmuje wynagrodzenia zasadniczego.")
 
-      st.markdown(
-          f"""
-                <hr style="border:1px dashed #cbd5e1; margin:15px 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <p style="margin:2px 0;"><strong>Wynagrodzenie za nadgodziny:</strong> {e_det['total_ot']} godz. ({e_det['ot_pay']:,.2f} zł)</p>
-                        <p style="margin:2px 0;"><strong>Dodatek za wózek widłowy:</strong> {e_det['forklift_pay']:,.2f} zł ({e_det['emp_forklift_hours']} h / {e_det['emp_forklift_pct']:.2f}%)</p>
-                        <p style="margin:2px 0;"><strong>Dodatek za rozładunki/załadunki palet:</strong> {e_det['pallet_pay']:,.2f} zł</p>
-                        <p style="margin:2px 0;"><strong>Premie specjalne i uznaniowe:</strong> {e_det['spec_bonus_val']:,.2f} zł {spec_details_html}</p>
-                    </div>
-                    <div style="background-color:#f1f5f9; padding:10px 15px; border-radius:8px; border:1px solid #cbd5e1;">
-                        <span style="font-size:16px; font-weight:bold;">SUMA PREMII I DODATKÓW: </span>
-                        <span style="font-size:22px; font-weight:bold; color:#1e3a8a;">{e_det['total_payout']:,.2f} zł netto</span>
-                    </div>
-                </div>
-            </div>
-            """,
-          unsafe_allow_html=True,
-      )
+        with st.expander("Wykaz nieobecności"):
+          _absences = e_det["absences_table"]
+          if _absences.empty:
+            st.info("Brak zarejestrowanych nieobecności za wybrany okres.")
+          else:
+            st.dataframe(
+                _absences,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Udział pracy w miesiącu (%)": st.column_config.NumberColumn(
+                        format="%.2f %%"
+                    ),
+                },
+            )
 
 if selected_module == "Produkcja i premie":
   _render_calculator_tab()
