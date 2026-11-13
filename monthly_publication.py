@@ -237,10 +237,11 @@ def prepare_publication(label, archive, profiles):
                 amount = _decimal(detail["Kwota netto premii"], "kwota premii specjalnej")
                 if amount == 0:
                     continue
-                reason = str(detail["Powód przyznania premii"] or "").strip()
-                awarded_by = str(detail["Kto przyznał"] or "").strip()
-                if (not reason or reason.casefold() == "nan" or len(reason) > 200
-                        or len(awarded_by) > 100 or awarded_by.casefold() == "nan"):
+                reason_raw = detail["Powód przyznania premii"]
+                author_raw = detail["Kto przyznał"]
+                reason = "" if pd.isna(reason_raw) else str(reason_raw).strip()
+                awarded_by = "" if pd.isna(author_raw) else str(author_raw).strip()
+                if not reason or len(reason) > 200 or len(awarded_by) > 100:
                     raise PublicationValidationError("Uzupełnij uzasadnienie i autora premii specjalnej.")
                 special_details.append({
                     "amount_pln": str(amount), "reason": reason,
