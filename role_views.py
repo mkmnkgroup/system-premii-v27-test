@@ -147,7 +147,7 @@ def _my_payslip(period, user_id):
         c2.metric("Dodatki (PLN)", row.get("bonus_additions_pln", "—"))
         st.metric("Premia końcowa (PLN)", row.get("bonus_final_pln", "—"))
         st.caption("Potrącenie za nieobecności: " + str(row.get("absence_reduction_pct", "—")) + "%")
-        st.caption("Testowy pasek premiowy. Nie stanowi dokumentu płacowego.")
+        st.caption("Wydanie PDF · System Premii 2.7 TEST · 13.11.2026. Nie stanowi dokumentu płacowego.")
         _overtime_metrics(row)
         profiles = _get("app_user_profiles", filters={"user_id": "eq." + user_id},
                         columns="user_id,employee_id,display_name", limit=1)
