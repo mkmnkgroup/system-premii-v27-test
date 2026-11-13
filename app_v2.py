@@ -23,6 +23,7 @@ st.set_page_config(
 
 from premium_theme import apply_theme, hero
 from employee_excel import read_employees_excel, write_employees_excel
+from bonus_slip_pdf import generate_bonus_slip_pdf
 
 if "premium_ui_mode" not in st.session_state:
   st.session_state.premium_ui_mode = "Jasny"
@@ -536,6 +537,8 @@ def calculate_payroll(
     daily_work_pct_map,
     special_bonuses_df,
     include_absence_deduction=False,
+    pallet_count=0.0,
+    pallet_rate=0.0,
 ):
   emp_summary = []
   emp_details_map = {}
@@ -623,6 +626,7 @@ def calculate_payroll(
 
     spec_bonus_val = 0.0
     spec_reasons_list = []
+    spec_bonus_items = []
     if (
         not special_bonuses_df.empty
         and "Pracownik" in special_bonuses_df.columns
@@ -640,6 +644,11 @@ def calculate_payroll(
         k_txt = str(s_row.get("Kto przyznał", "")).strip()
         q_val = float(s_row.get("Kwota netto premii", 0.0))
         if q_val > 0:
+          spec_bonus_items.append({
+              "amount": q_val,
+              "reason": r_txt,
+              "approved_by": k_txt,
+          })
           spec_reasons_list.append(
               f"{q_val:,.2f} zł — {r_txt}"
               + (f" (przyznał: {k_txt})" if k_txt else "")
@@ -686,7 +695,13 @@ def calculate_payroll(
         "emp_forklift_hours": emp_forklift_hours,
         "emp_forklift_pct": emp_forklift_pct,
         "forklift_pay": forklift_pay,
+        "forklift_pool": float(st.session_state.forklift_pool),
+        "total_forklift_hours": float(total_forklift_hours),
         "pallet_pay": pallet_pay,
+        "pallet_count": float(pallet_count),
+        "pallet_rate": float(pallet_rate),
+        "pallet_recipients": (len(selected_pallet_emps) if emp_name in selected_pallet_emps else 0),
+        "ot_rate": float(ot_rate),
         "days_worked": days_worked,
         "scheduled_days": scheduled_work_days,
         "absent_days": absent_days,
@@ -697,6 +712,7 @@ def calculate_payroll(
         "ot_pay": ot_pay,
         "spec_bonus_val": spec_bonus_val,
         "spec_reasons_list": spec_reasons_list,
+        "spec_bonus_items": spec_bonus_items,
         "total_payout": total_payout,
         "absences_table": pd.DataFrame(absences_list),
     }
@@ -1676,6 +1692,8 @@ def _render_calculator_tab():
         daily_work_pct_map=daily_work_pct_map,
         special_bonuses_df=st.session_state.special_bonuses_df,
         include_absence_deduction=include_absence_deduction,
+        pallet_count=manual_pallets,
+        pallet_rate=st.session_state.rate_pallet,
     )
 
     col_tot1, col_tot2, col_tot3 = st.columns(3)
@@ -1779,6 +1797,25 @@ def _render_calculator_tab():
       e_det = emp_details_map.get(e_name)
       if not e_det:
         continue
+
+      try:
+        slip_bytes = generate_bonus_slip_pdf(
+            e_name, period_key, e_det, absence_mode=include_absence_deduction
+        )
+      except Exception:
+        st.error("Nie udało się przygotować paska PDF. Skontaktuj się z administratorem.")
+      else:
+        slip_name = re.sub(
+            r"[^A-Za-z0-9_-]+", "_", f"{e_name}_{period_key}"
+        ).strip("_")
+        st.download_button(
+            label="📄 Pobierz szczegółowy pasek premiowy (PDF)",
+            data=slip_bytes,
+            file_name=f"Pasek_Premiowy_{slip_name}.pdf",
+            mime="application/pdf",
+            key="download_premium_slip_pdf",
+            use_container_width=True,
+        )
 
       deduction_html_info = (
           f'<p style="margin:3px 0; color:#dc2626;"><strong>Potrącenie za'
