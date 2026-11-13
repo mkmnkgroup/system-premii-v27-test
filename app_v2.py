@@ -8,6 +8,9 @@ from datetime import datetime
 import io
 import json
 import re
+import hashlib
+import logging
+from html import escape
 import holidays
 import pandas as pd
 import streamlit as st
@@ -1670,24 +1673,58 @@ def _render_calculator_tab():
       if not e_det:
         continue
 
-      try:
-        slip_bytes = generate_bonus_slip_pdf(
-            e_name, period_key, e_det, absence_mode=include_absence_deduction
-        )
-      except Exception:
-        st.error("Nie udało się przygotować paska PDF. Skontaktuj się z administratorem.")
-      else:
+      # A PDF is created only on request, not on every Streamlit widget rerun.
+      # The fingerprint prevents a stale file after editing any payroll component.
+      _slip_payload = dict(e_det)
+      _slip_payload["absences_table"] = e_det["absences_table"].to_dict("records")
+      _slip_signature = hashlib.sha256(
+          json.dumps(
+              [period_key, e_name, include_absence_deduction, _slip_payload],
+              sort_keys=True, ensure_ascii=False, default=str,
+          ).encode("utf-8")
+      ).hexdigest()
+
+      st.caption("PDF tworzony jest na żądanie — zmiana danych nie uruchamia wydruku.")
+      if st.button(
+          "📄 Przygotuj PDF wybranego pracownika",
+          key="prepare_bonus_slip_pdf",
+          use_container_width=True,
+      ):
+        try:
+          slip_bytes = generate_bonus_slip_pdf(
+              e_name, period_key, e_det, absence_mode=include_absence_deduction
+          )
+        except Exception:
+          logging.getLogger(__name__).exception("Bonus slip PDF generation failed")
+          st.session_state.pop("_prepared_bonus_slip", None)
+          st.error(
+              "Nie udało się wygenerować PDF. Szczegóły techniczne zapisano "
+              "w logach aplikacji testowej."
+          )
+        else:
+          st.session_state["_prepared_bonus_slip"] = {
+              "fingerprint": _slip_signature,
+              "bytes": slip_bytes,
+          }
+          st.success("PDF jest gotowy do pobrania.")
+
+      _prepared = st.session_state.get("_prepared_bonus_slip")
+      if isinstance(_prepared, dict) and _prepared.get("fingerprint") == _slip_signature:
         slip_name = re.sub(
             r"[^A-Za-z0-9_-]+", "_", f"{e_name}_{period_key}"
         ).strip("_")
         st.download_button(
-            label="📄 Pobierz szczegółowy pasek premiowy (PDF)",
-            data=slip_bytes,
+            label="⬇️ Pobierz pasek premiowy (PDF)",
+            data=_prepared["bytes"],
             file_name=f"Pasek_Premiowy_{slip_name}.pdf",
             mime="application/pdf",
             key="download_premium_slip_pdf",
+            on_click="ignore",
             use_container_width=True,
         )
+
+      _safe_name = escape(str(e_name))
+      _safe_position = escape(str(e_det["position"]))
 
       deduction_html_info = (
           f'<p style="margin:3px 0; color:#dc2626;"><strong>Potrącenie za'
@@ -1702,7 +1739,7 @@ def _render_calculator_tab():
             <div class="pay-slip">
                 <div class="pay-slip-header">
                     <h3 style="margin:0; color:#1e3a8a;">PASEK ROZLICZENIA PREMIOWEGO — {period_key.upper()}</h3>
-                    <p style="margin:5px 0 0 0; font-size:16px;"><strong>Pracownik:</strong> {e_name} | <strong>Stanowisko:</strong> {e_det['position']}</p>
+                    <p style="margin:5px 0 0 0; font-size:16px;"><strong>Pracownik:</strong> {_safe_name} | <strong>Stanowisko:</strong> {_safe_position}</p>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                     <div>
@@ -1713,7 +1750,7 @@ def _render_calculator_tab():
                     <div style="text-align: right;">
                         <p style="margin:3px 0;"><strong>Maks. premia bazowa:</strong> {e_det['base_emp_bonus']:,.2f} zł</p>
                         {deduction_html_info}
-                        <p style="margin:3px 0; font-size:18px; color:#16a34a;"><strong>Należna premia frekwencyjna:</strong> {e_det['calculated_bonus']:,.2f} zł</p>
+                        <p style="margin:3px 0; font-size:18px; color:#16a34a;"><strong>Premia produkcyjna po uwzględnieniu wariantu:</strong> {e_det['calculated_bonus']:,.2f} zł</p>
                     </div>
                 </div>
             """,
@@ -1724,7 +1761,14 @@ def _render_calculator_tab():
       abs_df_view = e_det["absences_table"]
 
       if abs_df_view.empty:
-        st.success("Brak nieobecności w tym miesiącu — 100% frekwencji!")
+        if e_det["days_worked"] < e_det["scheduled_days"]:
+          st.warning(
+              "Brak zarejestrowanych nieobecności, ale część dni pracy "
+              "nie została jeszcze potwierdzona. Wariant bez potrąceń "
+              "nie oznacza 100% potwierdzonej frekwencji."
+          )
+        else:
+          st.success("Brak zarejestrowanych nieobecności.")
       else:
         st.dataframe(
             abs_df_view,
@@ -1742,7 +1786,7 @@ def _render_calculator_tab():
         spec_details_html = (
             "<br><small style='color:#475569;'>Wykaz premii"
             " specjalnych:<br>• "
-            + "<br>• ".join(e_det["spec_reasons_list"])
+            + "<br>• ".join(escape(str(x)) for x in e_det["spec_reasons_list"])
             + "</small>"
         )
 
@@ -1757,7 +1801,7 @@ def _render_calculator_tab():
                         <p style="margin:2px 0;"><strong>Premie specjalne i uznaniowe:</strong> {e_det['spec_bonus_val']:,.2f} zł {spec_details_html}</p>
                     </div>
                     <div style="background-color:#f1f5f9; padding:10px 15px; border-radius:8px; border:1px solid #cbd5e1;">
-                        <span style="font-size:16px; font-weight:bold;">DO WYPŁATY 💡: </span>
+                        <span style="font-size:16px; font-weight:bold;">SUMA PREMII I DODATKÓW: </span>
                         <span style="font-size:22px; font-weight:bold; color:#1e3a8a;">{e_det['total_payout']:,.2f} zł netto</span>
                     </div>
                 </div>
