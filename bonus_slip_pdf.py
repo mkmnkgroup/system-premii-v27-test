@@ -5,11 +5,13 @@ from pathlib import Path
 from fpdf import FPDF
 
 FONT_PATHS = (
+    Path(__file__).resolve().parent / "assets" / "fonts" / "DejaVuSans.ttf",
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("/usr/local/share/fonts/DejaVuSans.ttf"),
     Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
 )
 BOLD_FONT_PATHS = (
+    Path(__file__).resolve().parent / "assets" / "fonts" / "DejaVuSans-Bold.ttf",
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
     Path("/usr/local/share/fonts/DejaVuSans-Bold.ttf"),
     Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"),
