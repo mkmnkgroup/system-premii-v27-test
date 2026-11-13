@@ -180,6 +180,16 @@ def prepare_publication(label, archive, profiles):
         raise PublicationValidationError("Brak zatwierdzonego harmonogramu w archiwum.")
     if not isinstance(metrics, dict):
         raise PublicationValidationError("Brak zbiorczych parametrów produkcji.")
+    breakdowns = archive.get("bonus_breakdowns")
+    if breakdowns is not None and not isinstance(breakdowns, dict):
+        raise PublicationValidationError("Uszkodzone szczegóły premii w archiwum.")
+    normalized_breakdowns = {}
+    if breakdowns is not None:
+        for key, data in breakdowns.items():
+            normalized_key = canonical_name(key)
+            if normalized_key in normalized_breakdowns or not isinstance(data, dict):
+                raise PublicationValidationError("Powtórzone lub uszkodzone szczegóły premii.")
+            normalized_breakdowns[normalized_key] = data
 
     required_summary = {
         "Pracownik", "Premia (zł)", "ŁĄCZNA PREMIA / DODATKI (zł)",
@@ -278,7 +288,41 @@ def prepare_publication(label, archive, profiles):
                 f"Nieprawidłowa liczba przepracowanych dni pracownika „{name}”: "
                 f"potwierdzono {attendance['confirmed']}, w rozliczeniu {worked}."
             )
+        published_breakdown = None
+        published_base = None
+        if breakdowns is not None:
+            published_breakdown = normalized_breakdowns.get(normalized)
+            if published_breakdown is None:
+                raise PublicationValidationError(
+                    f"Brakuje szczegółów premii dla pracownika „{name}”."
+                )
+            from bonus_components import parse_bonus_breakdown
+            try:
+                verified = parse_bonus_breakdown({
+                    "bonus_additions_pln": str(additions),
+                    "overtime_hours": str(overtime_hours) if overtime_hours is not None else None,
+                    "overtime_pay_pln": str(overtime_pay),
+                    "bonus_breakdown": published_breakdown,
+                })
+                published_base = _decimal(published_breakdown.get("base_bonus_pln"), "premia bazowa")
+            except ValueError:
+                raise PublicationValidationError(
+                    f"Szczegóły premii pracownika „{name}” są niespójne."
+                ) from None
+            if published_base + Decimal("0.01") < main:
+                raise PublicationValidationError(f"Nieprawidłowa premia bazowa pracownika „{name}”.")
+            for amount, field in [
+                (verified["forklift_pay"], "Dodatek Wózek (zł)"),
+                (verified["pallet_pay"], "Dodatek Palety (zł)"),
+                (verified["special_total"], "Premia Specjalna (zł)"),
+            ]:
+                if abs(amount - _decimal(source[field], field)) > Decimal("0.01"):
+                    raise PublicationValidationError(
+                        f"Szczegóły premii pracownika „{name}” różnią się od archiwum."
+                    )
         rows.append({
+            "bonus_breakdown": published_breakdown,
+            "bonus_base_pln": str(published_base) if published_base is not None else None,
             "user_id": uid,
             "employee_name": name,
             "planned_days": planned,
@@ -290,4 +334,6 @@ def prepare_publication(label, archive, profiles):
             "overtime_hours": str(overtime_hours) if overtime_hours is not None else None,
             "overtime_pay_pln": str(overtime_pay),
         })
+    if breakdowns is not None and set(normalized_breakdowns) != seen_names:
+        raise PublicationValidationError("Szczegóły premii zawierają osoby spoza rozliczenia.")
     return period, kpis, rows
