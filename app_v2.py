@@ -1744,23 +1744,33 @@ def _render_calculator_tab():
           "💾 Zapisz rozliczenie w archiwum sesji testowej",
           use_container_width=True,
       ):
-        pending_archive = dict(st.session_state.history_v2)
-        pending_archive[period_key] = {
-            "summary": summary_df,
-            "schedule": df_sched,
-            "metrics": {
-                "pcs": cur_pcs,
-                "lines": cur_lines,
-                "weight": cur_weight,
-                "pallets": manual_pallets,
-                "indicator": indicator,
-                "bonus_rate": bonus_rate,
-                "variant": selected_variant,
-            },
-        }
-        if save_archive(pending_archive):
-          st.session_state.history_v2 = pending_archive
-          st.success(f"Zarchiwizowano rozliczenie za okres {period_key}!")
+        from monthly_publication import snapshot_bonus_breakdowns, PublicationValidationError
+        try:
+          bonus_breakdowns = snapshot_bonus_breakdowns(summary_df, emp_details_map)
+        except PublicationValidationError as error:
+          st.error(f"Nie zapisano rozliczenia: {error}")
+        else:
+          pending_archive = dict(st.session_state.history_v2)
+          pending_archive[period_key] = {
+              "summary": summary_df,
+              "schedule": df_sched,
+              "bonus_breakdowns": bonus_breakdowns,
+              "metrics": {
+                  "pcs": cur_pcs,
+                  "lines": cur_lines,
+                  "weight": cur_weight,
+                  "pallets": manual_pallets,
+                  "indicator": indicator,
+                  "bonus_rate": bonus_rate,
+                  "variant": selected_variant,
+              },
+          }
+          if save_archive(pending_archive):
+            st.session_state.history_v2 = pending_archive
+            st.success(
+                f"Zarchiwizowano rozliczenie za okres {period_key} "
+                "wraz ze szczegółami dodatków i premiami specjalnymi!"
+            )
 
     with col_save2:
       hr_buffer = io.BytesIO()
