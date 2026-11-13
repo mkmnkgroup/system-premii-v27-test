@@ -97,9 +97,24 @@ def render_month_publication(label, archived_period):
         "Dodatki (zł)": row["bonus_additions_pln"],
         "Nadgodziny (h)": row["overtime_hours"],
         "Za nadgodziny (zł)": row["overtime_pay_pln"],
+        "Wózek (h)": row["forklift_hours"],
+        "Za wózek (zł)": row["forklift_pay_pln"],
+        "Palety zespołu": row["pallet_team_count"],
+        "Osób w podziale palet": row["pallet_recipients"],
+        "Za palety (zł)": row["pallet_pay_pln"],
+        "Specjalne (zł)": row["special_pay_pln"],
         "Łącznie (zł)": row["bonus_final_pln"],
     } for row in rows])
     st.dataframe(table, hide_index=True, width="stretch")
+    st.caption(
+        "Liczba palet oznacza wynik całego zespołu, nie liczbę palet "
+        "przeniesionych przez pojedynczego pracownika."
+    )
+    for row in rows:
+        details = row.get("special_details")
+        if details:
+            st.markdown("**Premie specjalne: " + row["employee_name"] + "**")
+            st.dataframe(pd.DataFrame(details), hide_index=True, width="stretch")
     st.caption(
         "Archiwum nie zawiera potwierdzonych indywidualnych wyników "
         "pozycji/sztuk/masy. Nie zostaną one wymyślone ani wpisane jako zero. "

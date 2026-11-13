@@ -71,6 +71,9 @@ def prepare_publication(label, archive, profiles):
     summary = archive.get("summary")
     schedule = archive.get("schedule")
     metrics = archive.get("metrics")
+    special_source = archive.get("special_bonuses")
+    if special_source is not None and not isinstance(special_source, pd.DataFrame):
+        raise PublicationValidationError("Archiwum premii specjalnych jest nieprawidłowe.")
     if not isinstance(summary, pd.DataFrame) or summary.empty or len(summary) > 50:
         raise PublicationValidationError("Brak kompletnego rozliczenia pracowników.")
     if not isinstance(schedule, pd.DataFrame) or schedule.empty:
@@ -170,6 +173,88 @@ def prepare_publication(label, archive, profiles):
                                        for v in own_schedule["NADGODZINY (godz.)"]), Decimal("0"))
                 if overtime_hours != confirmed_hours:
                     raise PublicationValidationError("Nadgodziny rozliczenia nie zgadzają się z ewidencją.")
+        # Preserve genuine source details. Historic archives lacking them remain
+        # marked unknown; no individual pallet count is fabricated.
+        overtime_rate = (
+            _decimal(source["Nadgodziny (stawka zł/h)"], "stawka nadgodzin")
+            if "Nadgodziny (stawka zł/h)" in summary.columns else None
+        )
+        if overtime_rate is not None and overtime_hours is not None:
+            if abs(overtime_hours * overtime_rate - overtime_pay) > Decimal("0.01"):
+                raise PublicationValidationError("Niezgodna stawka i kwota nadgodzin.")
+
+        forklift_pay = _decimal(source["Dodatek Wózek (zł)"], "dodatek za wózek")
+        forklift_hours = (
+            _decimal(source["Czas wózka (h)"], "czas wózka")
+            if "Czas wózka (h)" in summary.columns else None
+        )
+        forklift_team_hours = (
+            sum((_decimal(v, "łączny czas wózka") for v in summary["Czas wózka (h)"]),
+                Decimal("0.00"))
+            if "Czas wózka (h)" in summary.columns else None
+        )
+        if forklift_hours is not None and forklift_team_hours is not None:
+            if forklift_hours > forklift_team_hours or (
+                forklift_team_hours == 0 and forklift_pay != 0
+            ):
+                raise PublicationValidationError("Niespójny udział w pracy wózka.")
+
+        pallet_pay = _decimal(source["Dodatek Palety (zł)"], "dodatek za palety")
+        pallet_team_count = (
+            _decimal(metrics["pallets"], "liczba palet zespołu")
+            if metrics.get("pallets") is not None else None
+        )
+        pallet_rate = (
+            _decimal(metrics["pallet_rate_pln"], "stawka za paletę")
+            if metrics.get("pallet_rate_pln") is not None else None
+        )
+        pallet_recipients = (
+            _int(metrics["pallet_recipient_count"], "liczba osób w podziale", maximum=50)
+            if metrics.get("pallet_recipient_count") is not None else None
+        )
+        if (pallet_team_count is not None and pallet_rate is not None
+                and pallet_recipients is not None):
+            if pallet_recipients == 0:
+                if pallet_pay != 0:
+                    raise PublicationValidationError("Dodatek paletowy bez osób w podziale.")
+            elif pallet_pay > 0:
+                expected_pallet_pay = (pallet_team_count * pallet_rate
+                                       / Decimal(pallet_recipients))
+                if abs(expected_pallet_pay - pallet_pay) > Decimal("0.01"):
+                    raise PublicationValidationError("Dodatek paletowy nie odpowiada podziałowi puli.")
+
+        special_pay = _decimal(source["Premia Specjalna (zł)"], "premia specjalna")
+        special_details = None
+        if special_source is not None:
+            required = {"Pracownik", "Kwota netto premii",
+                        "Powód przyznania premii", "Kto przyznał"}
+            if not required.issubset(special_source.columns):
+                raise PublicationValidationError("Brak wymaganych kolumn premii specjalnych.")
+            special_details = []
+            for _, detail in special_source.iterrows():
+                if str(detail["Pracownik"]).strip().casefold() != normalized:
+                    continue
+                amount = _decimal(detail["Kwota netto premii"], "kwota premii specjalnej")
+                if amount == 0:
+                    continue
+                reason_raw = detail["Powód przyznania premii"]
+                author_raw = detail["Kto przyznał"]
+                reason = "" if pd.isna(reason_raw) else str(reason_raw).strip()
+                awarded_by = "" if pd.isna(author_raw) else str(author_raw).strip()
+                if not reason or len(reason) > 200 or len(awarded_by) > 100:
+                    raise PublicationValidationError("Uzupełnij uzasadnienie i autora premii specjalnej.")
+                special_details.append({
+                    "amount_pln": str(amount), "reason": reason,
+                    "awarded_by": awarded_by,
+                })
+                if len(special_details) > 12:
+                    raise PublicationValidationError("Zbyt wiele osobnych premii specjalnych.")
+            if abs(sum((Decimal(d["amount_pln"]) for d in special_details),
+                       Decimal("0.00")) - special_pay) > Decimal("0.01"):
+                raise PublicationValidationError(
+                    "Wykaz premii specjalnych nie zgadza się z rozliczeniem."
+                )
+
         if planned > 31 or worked != attendance["confirmed"]:
             raise PublicationValidationError(
                 f"Nieprawidłowa liczba przepracowanych dni pracownika „{name}”: "
@@ -186,5 +271,15 @@ def prepare_publication(label, archive, profiles):
             "absence_reduction_pct": str(deduction),
             "overtime_hours": str(overtime_hours) if overtime_hours is not None else None,
             "overtime_pay_pln": str(overtime_pay),
+            "overtime_rate_pln": str(overtime_rate) if overtime_rate is not None else None,
+            "forklift_hours": str(forklift_hours) if forklift_hours is not None else None,
+            "forklift_team_hours": str(forklift_team_hours) if forklift_team_hours is not None else None,
+            "forklift_pay_pln": str(forklift_pay),
+            "pallet_team_count": str(pallet_team_count) if pallet_team_count is not None else None,
+            "pallet_rate_pln": str(pallet_rate) if pallet_rate is not None else None,
+            "pallet_recipients": pallet_recipients,
+            "pallet_pay_pln": str(pallet_pay),
+            "special_pay_pln": str(special_pay),
+            "special_details": special_details,
         })
     return period, kpis, rows

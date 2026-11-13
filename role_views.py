@@ -149,6 +149,38 @@ def _my_payslip(period, user_id):
         st.caption("Potrącenie za nieobecności: " + str(row.get("absence_reduction_pct", "—")) + "%")
         st.caption("Wydanie PDF · System Premii 2.7 TEST · 13.11.2026. Nie stanowi dokumentu płacowego.")
         _overtime_metrics(row)
+        breakdown = (
+            row.get("overtime_pay_pln") is not None
+            and all(row.get(key) is not None for key in (
+                "forklift_pay_pln", "pallet_pay_pln", "special_pay_pln"
+            ))
+        )
+        if breakdown:
+            st.markdown("**Rozbicie dodatków do premii**")
+            st.metric("Dodatek za wózek widłowy (PLN)", row["forklift_pay_pln"])
+            st.metric("Dodatek za palety (PLN)", row["pallet_pay_pln"])
+            st.metric("Premie specjalne (PLN)", row["special_pay_pln"])
+            if row.get("forklift_hours") is not None:
+                st.caption("Czas na wózku: " + str(row["forklift_hours"]) + " h")
+            if row.get("pallet_team_count") is not None:
+                st.caption(
+                    "Palety całego zespołu: " + str(row["pallet_team_count"])
+                    + " · liczba osób w podziale: " + str(row.get("pallet_recipients", "Brak danych"))
+                    + ". To nie jest indywidualna liczba rozładowanych palet."
+                )
+            details = row.get("special_details")
+            if isinstance(details, list):
+                for item in details:
+                    if isinstance(item, dict):
+                        st.write(
+                            "Premia specjalna: " + str(item.get("amount_pln", "?"))
+                            + " zł — " + str(item.get("reason", "brak uzasadnienia"))
+                            + (", przyznał: " + str(item["awarded_by"])
+                               if item.get("awarded_by") else "")
+                        )
+            st.caption("Wszystkie powyższe składniki są już uwzględnione w kwocie końcowej.")
+        else:
+            st.caption("Dla tego miesiąca brak pełnego historycznego rozbicia dodatków.")
         profiles = _get("app_user_profiles", filters={"user_id": "eq." + user_id},
                         columns="user_id,employee_id,display_name", limit=1)
         if (not profiles or len(profiles) != 1
