@@ -7,6 +7,10 @@ on:
       - "bonus_components.py"
       - "payslip_pdf.py"
       - "role_views.py"
+      - "monthly_publication.py"
+      - "month_publication_ui.py"
+      - "app_v2.py"
+      - "tests/test_monthly_publication.py"
       - "tests/test_bonus_components.py"
       - "tests/test_payslip_pdf.py"
       - "tests/test_role_views.py"
@@ -34,3 +38,5 @@ jobs:
           python -m unittest discover -s tests -p "test_bonus_components.py" -v
           python -m unittest discover -s tests -p "test_payslip_pdf.py" -v
           python -m unittest discover -s tests -p "test_role_views.py" -v
+          python -m unittest discover -s tests -p "test_monthly_publication.py" -v
+          python -m py_compile app_v2.py month_publication_ui.py monthly_publication.py
