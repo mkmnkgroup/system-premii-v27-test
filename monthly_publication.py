@@ -63,6 +63,109 @@ def _int(value, label, *, maximum=None):
     return number
 
 
+
+
+
+def snapshot_bonus_breakdowns(summary, details_map):
+    """Freeze a complete, verified, JSON-safe bonus breakdown alongside the archive.
+
+    This must run on calculator results BEFORE the monthly archive is saved.
+    Values come from the existing calculator, never from a second calculation.
+    """
+    from bonus_components import parse_bonus_breakdown
+
+    if not isinstance(summary, pd.DataFrame) or summary.empty or not isinstance(details_map, dict):
+        raise PublicationValidationError("Brak szczegółów naliczonych premii.")
+
+    names = {}
+    for key, details in details_map.items():
+        canonical = canonical_name(key)
+        if canonical in names or not isinstance(details, dict):
+            raise PublicationValidationError("Powtórzone lub niekompletne szczegóły pracowników.")
+        names[canonical] = details
+
+    snapshots = {}
+    seen = set()
+    for _, row in summary.iterrows():
+        name = str(row["Pracownik"]).strip()
+        canonical = canonical_name(name)
+        if canonical in seen or canonical not in names:
+            raise PublicationValidationError("Brak jednoznacznych szczegółów rozliczenia dla pracownika.")
+        seen.add(canonical)
+        details = names[canonical]
+
+        def money(value, field):
+            return str(_decimal(value, field))
+
+        special_items = details.get("spec_bonus_items")
+        if not isinstance(special_items, list):
+            raise PublicationValidationError("Brak wykazu premii specjalnych w kalkulatorze.")
+        bonuses = []
+        for item in special_items:
+            if not isinstance(item, dict):
+                raise PublicationValidationError("Nieprawidłowy wpis premii specjalnej.")
+            reason = str(item.get("reason") or "").strip()
+            approver = str(item.get("approved_by") or "").strip()
+            if not reason or len(reason) > 180 or len(approver) > 100:
+                raise PublicationValidationError("Każda premia specjalna musi mieć krótki opis.")
+            bonuses.append({
+                "amount_pln": money(item.get("amount"), "premia specjalna"),
+                "reason": reason,
+                "approved_by": approver,
+            })
+
+        detail = {
+            "base_bonus_pln": money(details.get("base_emp_bonus"), "premia bazowa"),
+            "overtime_rate_pln": money(details.get("ot_rate"), "stawka nadgodzin"),
+            "forklift_pay_pln": money(details.get("forklift_pay"), "dodatek wózek"),
+            "forklift_hours": money(details.get("emp_forklift_hours"), "godziny wózka"),
+            "forklift_team_hours": money(details.get("total_forklift_hours"), "godziny wózka zespołu"),
+            "forklift_pool_pln": money(details.get("forklift_pool"), "pula wózka"),
+            "pallet_pay_pln": money(details.get("pallet_pay"), "dodatek palety"),
+            "pallet_count": money(details.get("pallet_count"), "liczba palet"),
+            "pallet_rate_pln": money(details.get("pallet_rate"), "stawka za paletę"),
+            "pallet_recipients": _int(details.get("pallet_recipients"), "liczba odbiorców", maximum=50),
+            "special_bonuses": bonuses,
+        }
+        validation_row = {
+            "overtime_pay_pln": money(row["Nadgodziny (zł)"], "nadgodziny"),
+            "overtime_hours": money(row["Nadgodziny (godz.)"], "godziny nadliczbowe"),
+            "bonus_additions_pln": str(sum(
+                (_decimal(row[field], field) for field in (
+                    "Nadgodziny (zł)", "Dodatek Wózek (zł)",
+                    "Dodatek Palety (zł)", "Premia Specjalna (zł)",
+                )), Decimal("0.00")
+            )),
+            "bonus_breakdown": detail,
+        }
+        try:
+            parsed = parse_bonus_breakdown(validation_row)
+        except ValueError:
+            raise PublicationValidationError(
+                f"Kwoty lub dane dodatków pracownika „{name}” nie są spójne."
+            ) from None
+
+        for calc_value, field in [
+            (parsed["forklift_pay"], "Dodatek Wózek (zł)"),
+            (parsed["pallet_pay"], "Dodatek Palety (zł)"),
+            (parsed["special_total"], "Premia Specjalna (zł)"),
+        ]:
+            if abs(calc_value - _decimal(row[field], field)) > Decimal("0.01"):
+                raise PublicationValidationError(f"Dodatki pracownika „{name}” różnią się od kalkulatora.")
+
+        main = _decimal(row["Premia (zł)"], "premia główna")
+        base = _decimal(detail["base_bonus_pln"], "premia bazowa")
+        if base + Decimal("0.01") < main:
+            raise PublicationValidationError(f"Premia bazowa pracownika „{name}” jest niższa od należnej.")
+        if abs(_decimal(details.get("calculated_bonus"), "naliczona premia") - main) > Decimal("0.01"):
+            raise PublicationValidationError(f"Premia główna pracownika „{name}” różni się od kalkulatora.")
+
+        snapshots[name] = detail
+
+    if len(seen) != len(names):
+        raise PublicationValidationError("Szczegóły rozliczenia zawierają obcych pracowników.")
+    return snapshots
+
 def prepare_publication(label, archive, profiles):
     """Return (period, aggregate KPI dict, personal rows) after all checks."""
     period = period_date(label)
