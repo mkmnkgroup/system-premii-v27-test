@@ -1213,7 +1213,11 @@ def _render_calculator_tab():
                      for key, value in _approved.items() if key not in _catalog_keys]
         if _new_rows:
           _catalog = _pd.concat([_catalog, _pd.DataFrame(_new_rows)], ignore_index=True)
-        kpis = prepare_production(prod_df, _catalog, st.session_state.excluded_client_categories)
+        from bonus_analysis_cache import cached_production_totals
+        kpis = cached_production_totals(
+            prod_df, _catalog,
+            tuple(sorted(st.session_state.excluded_client_categories)),
+        )
         st.subheader("Kontrola danych produkcyjnych")
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("Pozycje", f"{kpis['positions']:,}".replace(",", " "))
@@ -1371,30 +1375,24 @@ def _render_calculator_tab():
         "📅 2. Dzienna Analiza Przyjęć i Rozkład Pracy (% Miesiąca)"
     )
 
-    # Calculate daily production from the same eligible rows and unit weights as monthly totals.
-    from production_import import DATE as _DATE, BRAND as _BRAND, ARTICLE as _ARTICLE, QTY as _QTY
-    daily_source = exclude_categories(prod_df, st.session_state.excluded_client_categories)[0].copy()
-    daily_source["_brand"] = daily_source[_BRAND].map(_normalize)
-    daily_source["_article"] = daily_source[_ARTICLE].map(_normalize)
-    daily_source["_qty"] = pd.to_numeric(daily_source[_QTY].astype(str).str.replace(",", ".", regex=False), errors="coerce")
-    _daily_weights = _catalog.copy()
-    _daily_weights["_brand"] = _daily_weights["Producent"].map(_normalize)
-    _daily_weights["_article"] = _daily_weights["Artykuł"].map(_normalize)
-    _daily_weights["_weight"] = pd.to_numeric(_daily_weights["Waga"].astype(str).str.replace(",", ".", regex=False), errors="coerce")
-    daily_source = daily_source.merge(_daily_weights[["_brand", "_article", "_weight"]], on=["_brand", "_article"], how="left", validate="many_to_one")
-    if _DATE not in daily_source.columns:
-      st.error("W zaimportowanych danych nie ma kolumny daty przejścia. Wgraj raport ponownie; jeśli problem pozostanie, sprawdź nagłówek: " + _DATE)
+    # Monthly and daily weight joins are unchanged by editing bonuses.
+    # A source file, approved weight, exclusion, or month change invalidates this cache.
+    from bonus_analysis_cache import cached_daily_totals
+    try:
+      daily_map, _invalid_dates, _outside = cached_daily_totals(
+          prod_df, _catalog,
+          tuple(sorted(st.session_state.excluded_client_categories)),
+          gen_year, gen_month_idx,
+      )
+    except (ValueError, KeyError, pd.errors.MergeError) as exc:
+      st.error(f"Nie można obliczyć analizy dziennej: {exc}")
       return
-    from production_import import parse_production_dates
-    daily_source["_date"] = parse_production_dates(daily_source[_DATE])
-    _invalid_dates = int(daily_source["_date"].isna().sum())
-    _outside = int((daily_source["_date"].notna() & ((daily_source["_date"].dt.year != gen_year) | (daily_source["_date"].dt.month != gen_month_idx))).sum())
     if _invalid_dates or _outside:
-      st.error(f"Nie można obliczyć analizy dziennej: niepoprawna data w {_invalid_dates} pozycjach; poza wybranym miesiącem: {_outside}.")
+      st.error(
+          f"Nie można obliczyć analizy dziennej: błędne daty w {_invalid_dates} "
+          f"pozycjach; poza wybranym miesiącem: {_outside}."
+      )
       return
-    daily_map = {day: {"pcs": 0.0, "lines": 0.0, "weight": 0.0} for day in range(1, calendar.monthrange(gen_year, gen_month_idx)[1] + 1)}
-    for _day, _group in daily_source.groupby(daily_source["_date"].dt.day):
-      daily_map[int(_day)] = {"pcs": float(_group["_qty"].sum()), "lines": float(len(_group)), "weight": float((_group["_qty"] * _group["_weight"]).sum())}
     if abs(sum(v["weight"] for v in daily_map.values()) - cur_weight) > 0.01:
       st.error("Niezgodność sumy wag dziennych i miesięcznych. Sprawdź dane źródłowe.")
       return
@@ -1459,8 +1457,12 @@ def _render_calculator_tab():
         hide_index=True,
     )
 
-    if cur_pcs > 0 or cur_lines > 0 or cur_weight > 0:
-      # Only load Plotly if the daily production chart is requested.
+    if (cur_pcs > 0 or cur_lines > 0 or cur_weight > 0) and st.toggle(
+        "Pokaż wykres dziennej produkcji",
+        value=False,
+        help="Wykres zostanie narysowany dopiero po włączeniu — to przyspiesza edycję dodatków.",
+        key="show_daily_chart_" + str(gen_year) + "_" + str(gen_month_idx),
+    ):
       import plotly.express as px
       fig_daily = px.bar(
           pd.DataFrame(daily_chart_data),
