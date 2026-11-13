@@ -676,6 +676,7 @@ def calculate_payroll(
         "Dodatek Palety (zł)": pallet_pay,
         "Nadgodziny (godz.)": total_ot,
         "Nadgodziny (zł)": ot_pay,
+        "Nadgodziny (stawka zł/h)": ot_rate,
         "Premia (zł)": calculated_bonus,
         "Premia Specjalna (zł)": spec_bonus_val,
         "ŁĄCZNA PREMIA / DODATKI (zł)": total_payout,
@@ -1730,11 +1731,14 @@ def _render_calculator_tab():
         pending_archive[period_key] = {
             "summary": summary_df,
             "schedule": df_sched,
+            "special_bonuses": st.session_state.special_bonuses_df.copy(),
             "metrics": {
                 "pcs": cur_pcs,
                 "lines": cur_lines,
                 "weight": cur_weight,
                 "pallets": manual_pallets,
+                "pallet_rate_pln": st.session_state.rate_pallet,
+                "pallet_recipient_count": num_selected_pallet_emps,
                 "indicator": indicator,
                 "bonus_rate": bonus_rate,
                 "variant": selected_variant,
