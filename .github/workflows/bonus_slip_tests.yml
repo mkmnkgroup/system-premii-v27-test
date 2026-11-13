@@ -37,6 +37,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install "fpdf2>=2.8,<3" "pypdf>=5,<7" "streamlit==1.66.0" "pandas>=2.2,<3" "requests>=2.31,<3"
+          python -m pip install "ruff>=0.14,<1"
+      - name: Catch undefined names before deployment
+        run: |
+          ruff check --select F821 app_v2.py bonus_input_form.py bonus_slip_pdf.py bonus_analysis_cache.py
       - name: Run payroll slip regression tests
         run: |
           python -m unittest discover -s tests -p "test_bonus_slip_generator.py" -v
