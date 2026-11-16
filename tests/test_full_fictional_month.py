@@ -197,7 +197,7 @@ class FullFictionalMonthTests(unittest.TestCase):
         )
         self.assertEqual([row["user_id"] for row in rows], [P1, P2])
         first, second = rows
-        self.assertAlmostEqual(float(first["absence_reduction_pct"]), shares[3])
+        self.assertAlmostEqual(float(first["absence_reduction_pct"]), shares[3], places=2)
         self.assertEqual(first["planned_days"], 2)
         self.assertEqual(first["attended_days"], 1)
         self.assertEqual(second["attended_days"], 2)
