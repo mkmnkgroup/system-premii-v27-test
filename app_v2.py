@@ -30,7 +30,7 @@ from bonus_slip_pdf import generate_bonus_slip_pdf
 if st.session_state.get("premium_ui_mode") not in ("Ciemny", "Jasny"):
   st.session_state.premium_ui_mode = "Jasny"
 
-apply_theme(st.session_state.premium_ui_mode or "Jasny")
+apply_theme(st.session_state.premium_ui_mode)
 hero()
 
 # ==========================================
@@ -782,8 +782,9 @@ st.sidebar.caption("MODUŁY · WERSJA TESTOWA")
 _sidebar_nav_labels = {
     "Pulpit": "01  Pulpit",
     "Harmonogram": ("✓ " if _schedule_matches_period else "02  ") + "Harmonogram",
+    # Wgranie plików nie oznacza jeszcze zakończenia naliczania.
     "Produkcja i premie": (
-        "✓ " if uploaded_month_file is not None and uploaded_weights_file is not None
+        "✓ " if period_key in st.session_state.history_v2
         else "03  "
     ) + "Produkcja i premie",
     "Analizy": "04  Analizy",
