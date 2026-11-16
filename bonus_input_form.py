@@ -29,6 +29,44 @@ def _safe_period_id(period):
     return "".join(ch if ch.isalnum() else "_" for ch in str(period))
 
 
+def committed_bonus_inputs(employees_df, period, default_pallets, pallet_rate):
+    """Read the last committed month-specific allowances without drawing the form.
+
+    The calculator calls this only after source production validation; the
+    form can instead be used earlier, in the separate Dodatki module.
+    """
+    people = employees_df["OSOBA"].dropna().astype(str).tolist()
+    if not people:
+        return 0.0, [], 0.0, 0.0
+    store = st.session_state.setdefault("_bonus_inputs_by_period", {})
+    if period not in store:
+        snapshot = _initial_snapshot(people, default_pallets)
+        if not store:
+            legacy_forklift = st.session_state.get("forklift_hours_df")
+            if isinstance(legacy_forklift, pd.DataFrame) and {
+                "OSOBA", "CZAS WÓZKA (godz.)"
+            }.issubset(legacy_forklift.columns):
+                snapshot["forklift"] = legacy_forklift[
+                    ["OSOBA", "CZAS WÓZKA (godz.)"]
+                ].copy()
+            legacy_special = st.session_state.get("special_bonuses_df")
+            if isinstance(legacy_special, pd.DataFrame) and set(
+                snapshot["specials"].columns
+            ).issubset(legacy_special.columns):
+                snapshot["specials"] = legacy_special.copy()
+        store[period] = snapshot
+    saved = store[period]
+    st.session_state.forklift_hours_df = saved["forklift"].copy()
+    st.session_state.special_bonuses_df = saved["specials"].copy()
+    hours = float(pd.to_numeric(
+        saved["forklift"]["CZAS WÓZKA (godz.)"], errors="coerce"
+    ).fillna(0.0).sum())
+    pallets = float(saved["pallets"])
+    selected = [person for person in saved["selected"] if person in people]
+    pool = pallets * float(pallet_rate)
+    return pallets, selected, hours, pool / len(selected) if selected else 0.0
+
+
 def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pallet_rate):
     """Render inputs, keep committed values, return payable allocation variables.
 
@@ -172,6 +210,7 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
                 })
                 st.session_state.forklift_hours_df = saved["forklift"].copy()
                 st.session_state.special_bonuses_df = specials.copy()
+                st.session_state.setdefault("_bonus_inputs_confirmed_by_period", {})[period] = True
                 st.session_state.pop("_prepared_bonus_slip", None)
                 st.toast("Dodatki zapisane i przeliczone.", icon="✅")
                 st.rerun()
