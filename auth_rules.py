@@ -32,10 +32,12 @@ def bind_user_session(state, user_id):
     """Discard all previous workspace data before binding a verified identity."""
     if state.get("_test_work_user_id") == user_id:
         return False
-    token = state.get("_test_auth_access_token")
+    # Keep the verified Supabase session pair on identity binding, but
+    # never retain any previous user's workspace, draft or widget data.
+    from auth_session import TOKEN_KEYS
+    auth = {key: state[key] for key in TOKEN_KEYS if key in state}
     state.clear()
-    if token:
-        state["_test_auth_access_token"] = token
+    state.update(auth)
     state["_test_work_user_id"] = user_id
     return True
 
