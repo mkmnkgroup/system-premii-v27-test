@@ -10,6 +10,7 @@ on:
       - "bonus_analysis_cache.py"
       - "tests/test_bonus_slip_generator.py"
       - "tests/test_full_fictional_month.py"
+      - "tests/test_bonus_form_interaction.py"
       - "tests/**"
       - "payslip_pdf.py"
       - "role_views.py"
@@ -53,5 +54,7 @@ jobs:
           python -m unittest discover -s tests -p "test_role_views.py" -v
           python -m unittest discover -s tests -p "test_monthly_publication.py" -v
           python -m py_compile app_v2.py month_publication_ui.py monthly_publication.py bonus_input_form.py bonus_analysis_cache.py bonus_slip_pdf.py
+      - name: Run warehouse bonus form interaction tests
+        run: python -m unittest discover -s tests -p "test_bonus_form_interaction.py" -v
       - name: Run complete Python test suite
         run: python -m unittest discover -s tests -v
