@@ -10,7 +10,7 @@ import streamlit as st
 
 from test_draft_persistence import (
     DraftError, DraftConflict, collect_draft, apply_draft, fingerprint,
-    read_draft, save_draft,
+    read_draft, save_draft, check_identity,
 )
 
 
@@ -19,9 +19,15 @@ def _context(year, month):
     token = st.session_state.get("_test_auth_access_token")
     if not uid or not token:
         return None
+    period = f"{int(year):04d}-{int(month):02d}-01"
+    try:
+        check_identity(uid, period)
+    except DraftError:
+        # No persistence without a real verified Supabase UUID.
+        return None
     from app_auth import _config
     url, key = _config()
-    return url, key, token, uid, f"{int(year):04d}-{int(month):02d}-01"
+    return url, key, token, uid, period
 
 
 def render_draft_controls(year, month, period_key):
