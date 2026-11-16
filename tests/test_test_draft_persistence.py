@@ -113,6 +113,28 @@ class DraftSnapshotTests(unittest.TestCase):
         self.assertEqual(state["_bonus_inputs_by_period"]["Grudzień 2026"]["pallets"], 999)
         self.assertEqual(state["_bonus_inputs_by_period"][KEY]["pallets"], 20.0)
 
+    def test_empty_tables_keep_expected_columns_after_restore(self):
+        state = state_fixture()
+        for field in ("employees_df", "special_bonuses_df", "forklift_hours_df",
+                      "groups_df", "absence_codes_df"):
+            state[field] = pd.DataFrame()
+        payload = collect_draft(state, KEY)
+        restored = {}
+        apply_draft(restored, payload, KEY)
+        self.assertEqual(
+            list(restored["employees_df"].columns),
+            ["OSOBA", "GRUPA", "SYSTEM", "STANOWISKO",
+             "FUNKCJA", "UPRAWNIENIA UDT"],
+        )
+        self.assertEqual(
+            list(restored["special_bonuses_df"].columns),
+            ["Pracownik", "Kwota netto premii",
+             "Powód przyznania premii", "Kto przyznał"],
+        )
+        self.assertIn("CZAS WÓZKA (godz.)", restored["forklift_hours_df"].columns)
+        self.assertIn("Oznaczenie", restored["absence_codes_df"].columns)
+        self.assertIn("Nazwa grupy", restored["groups_df"].columns)
+
     def test_hash_changes_only_when_payroll_draft_changes(self):
         state = state_fixture()
         old = fingerprint(collect_draft(state, KEY))
