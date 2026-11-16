@@ -91,7 +91,7 @@ class LargeMonthlyProductionTests(unittest.TestCase):
         self.assertEqual(sum(item["pcs"] for item in daily.values()), pieces)
         self.assertAlmostEqual(sum(item["weight"] for item in daily.values()), kg, places=5)
         self.assertEqual(monthly_again["positions"], monthly["positions"])
-        self.assertEqual(daily_again, daily)
+        self.assertEqual(daily_again, (daily, invalid_dates, outside_period))
 
         total_seconds = (
             elapsed_read_prod + elapsed_read_weights + elapsed_monthly + elapsed_daily
