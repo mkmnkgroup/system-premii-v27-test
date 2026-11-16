@@ -66,7 +66,7 @@ class ErpWorkspaceTests(unittest.TestCase):
             module = next(r for r in app.radio if r.label == "Moduł")
             module.set_value("Harmonogram").run()
             self.assertEqual(list(app.exception), [])
-            self.assertTrue(any("Harmonogram" in h.value for h in app.subheader))
+            self.assertTrue(any("Harmonogram na wybrany miesiąc" in h.value for h in app.markdown))
 
 if __name__ == "__main__":
     unittest.main()
