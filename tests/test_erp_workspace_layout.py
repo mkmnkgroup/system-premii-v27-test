@@ -56,8 +56,9 @@ class ErpWorkspaceTests(unittest.TestCase):
             # remain the unchanged internal module names.
             for shown, module_name in zip(
                 module.options,
-                ["Pulpit", "Harmonogram", "Produkcja i premie",
-                 "Analizy", "Archiwum", "Porównania", "Ustawienia"],
+                ["Pulpit", "Harmonogram", "Obecności i nadgodziny",
+                 "Dodatki premiowe", "Rozliczenie premii", "Archiwum",
+                 "Analizy", "Porównania", "Ustawienia"],
             ):
                 self.assertTrue(shown.endswith(module_name), shown)
             module.set_value("Ustawienia").run()
