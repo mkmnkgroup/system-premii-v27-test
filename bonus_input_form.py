@@ -93,7 +93,7 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
                         "Godziny (h)", min_value=0.0, max_value=300.0, step=0.5
                     ),
                 },
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 key="forklift_bonus_editor_" + safe_key,
             )
@@ -135,13 +135,13 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
                     "Kto przyznał": st.column_config.TextColumn("Kto przyznał"),
                 },
                 num_rows="dynamic",
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 key="bonus_special_editor_" + safe_key,
             )
 
         submitted = st.form_submit_button(
-            "Zapisz i przelicz dodatki", type="primary", use_container_width=True
+            "Zapisz i przelicz dodatki", type="primary", width="stretch"
         )
 
     if submitted:
