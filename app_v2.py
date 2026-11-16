@@ -861,8 +861,8 @@ if selected_module == "Pulpit":
 # ZAKŁADKA 1: HARMONOGRAM I SKANER
 # ==========================================
 if selected_module == "Harmonogram":
-  st.markdown("#### Harmonogram i rejestracja obecności")
-  st.caption("PLANOWANIE MIESIĄCA / Harmonogram · Obecności · Nieobecności")
+  st.markdown("#### Harmonogram na wybrany miesiąc")
+  st.caption("ETAP 01 / Zaplanuj grafik z wyprzedzeniem, jeszcze przed rozpoczęciem miesiąca.")
 
   if not _schedule_matches_period:
     st.info("Dla wybranego miesiąca nie ma jeszcze aktywnego harmonogramu. Możesz wygenerować nowy lub wgrać wcześniej zapisany.")
@@ -897,6 +897,34 @@ if selected_module == "Harmonogram":
       except Exception as e:
         st.error(f"Błąd odczytu pliku: {e}")
 
+  # Eksport i zapis planu pozostają w etapie przygotowania miesiąca.
+  with col_b2:
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+      st.session_state.current_schedule_df.to_excel(
+          writer, index=False, sheet_name="Harmonogram"
+      )
+    buffer.seek(0)
+    st.download_button(
+        label="📥 Pobierz Harmonogram (Excel)",
+        data=buffer,
+        file_name=f"Harmonogram_{period_key.replace(' ', '_')}.xlsx",
+        mime=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+        use_container_width=True,
+    )
+
+
+  from test_schedule_drafts import render_schedule_draft
+  render_schedule_draft(gen_year, gen_month_idx, period_key)
+
+def _render_attendance_module():
+  st.markdown("#### Ewidencja obecności i nadgodzin")
+  st.caption("ETAP 02 / W ciągu miesiąca: wejścia, wyjścia, nieobecności i nadgodziny.")
+  if not _schedule_matches_period:
+    st.warning("Najpierw przygotuj harmonogram tego miesiąca w module Harmonogram.")
+    return
   st.markdown("---")
 
   with st.expander("📥 1. Import Nieobecności z pliku Excel"):
@@ -1023,7 +1051,7 @@ if selected_module == "Harmonogram":
         st.rerun()
 
   st.markdown("---")
-  col_b1, col_b2, _ = st.columns([1.5, 1.5, 2])
+  col_b1, _, _ = st.columns([1.5, 1.5, 2])
   with col_b1:
     if st.button("⏱️ Uzupełnij planowane godziny", use_container_width=True):
       df_temp = st.session_state.current_schedule_df.copy()
@@ -1074,23 +1102,6 @@ if selected_module == "Harmonogram":
       st.session_state.current_schedule_df = df_temp
       st.success("Naniesiono planowane godziny!")
       st.rerun()
-
-  with col_b2:
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-      st.session_state.current_schedule_df.to_excel(
-          writer, index=False, sheet_name="Harmonogram"
-      )
-    buffer.seek(0)
-    st.download_button(
-        label="📥 Pobierz Harmonogram (Excel)",
-        data=buffer,
-        file_name=f"Harmonogram_{period_key.replace(' ', '_')}.xlsx",
-        mime=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
-        use_container_width=True,
-    )
 
   df_curr = st.session_state.current_schedule_df.copy()
   if "FAKTYCZNIE WEJŚCIE" not in df_curr.columns:
@@ -1174,19 +1185,35 @@ if selected_module == "Harmonogram":
   if isinstance(edited_df, pd.DataFrame):
     st.session_state.current_schedule_df = edited_df
 
-  # Private, versioned TEST drafts. Saving attendance never publishes it.
-  from test_schedule_drafts import render_schedule_draft
+
+  # Publikowanie obecności to osobna, świadomie zatwierdzana operacja.
+  # Sam zapis szkicu nie udostępnia danych pracownikom.
   from attendance_drafts import render_attendance_draft
-  render_schedule_draft(gen_year, gen_month_idx, period_key)
   render_attendance_draft(gen_year, gen_month_idx, period_key)
   from attendance_publication_ui import render_attendance_publication
   render_attendance_publication(gen_year, gen_month_idx)
+
+
+if selected_module == "Obecności i nadgodziny":
+  _render_attendance_module()
+
+if selected_module == "Dodatki premiowe":
+  st.markdown("#### Dodatki do premii")
+  st.caption("ETAP 03 / Wpisz czas pracy wózka, liczbę palet i premie specjalne przed rozliczeniem.")
+  from bonus_input_form import render_bonus_inputs
+  render_bonus_inputs(
+      st.session_state.employees_df,
+      period_key,
+      0.0,
+      st.session_state.forklift_pool,
+      st.session_state.rate_pallet,
+  )
 
 # ==========================================
 # ZAKŁADKA 2: KALKULATOR PREMII
 # ==========================================
 def _render_calculator_tab():
-  st.header("🧮 Rozliczenie Premiowe i Wynagrodzeń Dodatkowych")
+  st.header("🧮 Przeliczenie premii i dodatków")
 
   if st.session_state.current_schedule_df.empty or st.session_state.schedule_period_key != period_key:
     st.warning("Najpierw przygotuj harmonogram dla wybranego miesiąca w pierwszej zakładce.")
@@ -1202,7 +1229,7 @@ def _render_calculator_tab():
     cur_pcs, cur_lines, cur_weight, cur_pallets = 0.0, 0.0, 0.0, 0.0
     prod_df = pd.DataFrame()
     if uploaded_month_file is None:
-      st.info("Aby rozpocząć rozliczenie, wgraj raport produkcji w panelu bocznym. Harmonogram i ustawienia są dostępne bez raportu.")
+      st.info("Aby rozpocząć rozliczenie, otwórz powyżej „Dane źródłowe do rozliczenia” i wgraj raport produkcji. Dodatki można wcześniej przygotować w module Dodatki premiowe.")
       return
     if uploaded_month_file is not None:
       try:
@@ -1487,16 +1514,15 @@ def _render_calculator_tab():
       fig_daily.update_traces(marker_color="#1e3a8a")
       st.plotly_chart(fig_daily, use_container_width=True)
 
-    # Formularz zbiorczy: dopiero zatwierdzenie przelicza dane dodatków.
-    from bonus_input_form import render_bonus_inputs
+    # Dodatki są wprowadzane przed kalkulacją, w osobnym module.
+    from bonus_input_form import committed_bonus_inputs
     unique_emps = (
         st.session_state.employees_df["OSOBA"].dropna().unique().tolist()
     )
-    manual_pallets, selected_pallet_emps, total_forklift_hours, pallet_pay_per_selected_emp = render_bonus_inputs(
+    manual_pallets, selected_pallet_emps, total_forklift_hours, pallet_pay_per_selected_emp = committed_bonus_inputs(
         st.session_state.employees_df,
         period_key,
         cur_pallets,
-        st.session_state.forklift_pool,
         st.session_state.rate_pallet,
     )
 
@@ -1836,7 +1862,7 @@ def _render_calculator_tab():
                 },
             )
 
-if selected_module == "Produkcja i premie":
+if selected_module == "Rozliczenie premii":
   _render_calculator_tab()
 
 # ==========================================
@@ -1872,7 +1898,7 @@ if selected_module == "Analizy":
       st.plotly_chart(fig_ot, use_container_width=True)
   else:
     st.info(
-        "Zapisz rozliczenie do archiwum w zakładce Kalkulator Premii, aby"
+        "Zapisz rozliczenie w module Rozliczenie premii, aby"
         " wyświetlić wykresy."
     )
 
@@ -2116,7 +2142,7 @@ if selected_module == "Ustawienia":
   saved_excluded = st.session_state.excluded_client_categories
   available_categories = sorted(set(client_categories_in_file) | set(saved_excluded))
   if not client_categories_in_file:
-    st.info("Wgraj plik produkcji w panelu bocznym, aby zobaczyć grupy klientów. "
+    st.info("Wgraj plik produkcji w sekcji „Dane źródłowe do rozliczenia”, aby zobaczyć grupy klientów. "
             "Zapisane wykluczenia pozostają dostępne do edycji.")
   selected_excluded = st.multiselect(
       "Dodatkowe grupy wykluczone z premii i analiz:",
