@@ -224,7 +224,7 @@ def process_attendance_photo(image_file, api_key):
 # DOMYŚLNE DANE SYSTEMOWE I WCZYTANIE ZAPISANYCH
 # ==========================================
 st.warning("WERSJA TESTOWA — używaj wyłącznie fikcyjnych danych. "
-           "Wersję roboczą zapiszesz i przywrócisz w panelu bocznym; "
+           "Wersję roboczą zapiszesz i przywrócisz u góry strony; "
            "pliki źródłowe Excel trzeba ponownie wgrać po utracie sesji. "
            "Opublikowane rozliczenia nie są częścią wersji roboczej.")
 if "loaded_settings_v27" not in st.session_state:
@@ -857,7 +857,7 @@ if selected_module == "Pulpit":
       st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
       st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
       st.caption("Wgranie plików nie oznacza jeszcze zatwierdzenia obliczeń.")
-  st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Przed zakończeniem pracy zapisz wersję roboczą w panelu bocznym.</div>', unsafe_allow_html=True)
+  st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Przed zakończeniem pracy zapisz wersję roboczą u góry strony.</div>', unsafe_allow_html=True)
 
 # ==========================================
 # ZAKŁADKA 1: HARMONOGRAM I SKANER
