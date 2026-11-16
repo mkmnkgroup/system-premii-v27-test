@@ -8,6 +8,12 @@ on:
       - "bonus_slip_pdf.py"
       - "bonus_input_form.py"
       - "bonus_analysis_cache.py"
+      - "test_draft_persistence.py"
+      - "test_draft_ui.py"
+      - "app_auth.py"
+      - "auth_rules.py"
+      - "auth_session.py"
+      - "production_import.py"
       - "tests/test_bonus_slip_generator.py"
       - "tests/test_full_fictional_month.py"
       - "tests/test_bonus_form_interaction.py"
@@ -44,7 +50,7 @@ jobs:
           python -m pip install "psycopg[binary]>=3.2,<4" holidays plotly xlrd PyGithub
       - name: Catch undefined names before deployment
         run: |
-          ruff check --select F821 app_v2.py bonus_input_form.py bonus_slip_pdf.py bonus_analysis_cache.py
+          ruff check --select F821 app_v2.py bonus_input_form.py bonus_slip_pdf.py bonus_analysis_cache.py test_draft_persistence.py test_draft_ui.py
       - name: Run payroll slip regression tests
         run: |
           python -m unittest discover -s tests -p "test_full_fictional_month.py" -v
