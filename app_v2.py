@@ -799,6 +799,18 @@ selected_module = st.sidebar.radio(
     format_func=lambda name: _sidebar_nav_labels[name],
     key="erp_selected_module",
 )
+# Compact stage ribbon is visible above every module, not only on Pulpit.
+# A generated local schedule and imported Excel files are not marked as finalized.
+from workflow_progress import workflow_steps, progress_html
+_process_steps = workflow_steps(
+    st.session_state,
+    year=gen_year, month=gen_month_idx, period_label=period_key,
+    schedule_loaded=_schedule_matches_period,
+    production_loaded=uploaded_month_file is not None,
+    weights_loaded=uploaded_weights_file is not None,
+)
+st.markdown(progress_html(_process_steps, period_key), unsafe_allow_html=True)
+
 # Test-only, owner-scoped monthly drafts. No source files or published awards.
 from test_draft_ui import render_draft_controls, autosave_draft
 render_draft_controls(gen_year, gen_month_idx, period_key)
@@ -813,34 +825,12 @@ if selected_module == "Ustawienia" and uploaded_month_file is not None:
   except (ValueError, OSError, ImportError):
     st.warning("Nie można odczytać kategorii klientów z pliku.")
 
-st.markdown(
-    '<div class="work-commandbar">'
-    '<span class="work-commandbar-brand">PANEL OPERACYJNY</span>'
-    '<span>Harmonogram</span><span class="work-commandbar-arrow">›</span>'
-    '<span>Produkcja</span><span class="work-commandbar-arrow">›</span>'
-    '<span>Premie</span><span class="work-commandbar-arrow">›</span>'
-    '<span>Analizy i archiwum</span>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    f'<div class="work-record-header"><div>'
-    f'<div class="work-record-kicker">PODSUMOWANIE OKRESU · WERSJA TESTOWA</div>'
-    f'<h2>{period_key}</h2>'
-    f'<p>Najpierw zaplanuj harmonogram, następnie rozlicz produkcję i premie.</p>'
-    f'</div><span class="work-record-state">● Panel roboczy</span></div>',
-    unsafe_allow_html=True,
-)
 _step_plan = _schedule_matches_period
 _step_production = uploaded_month_file is not None
 _step_weights = uploaded_weights_file is not None
 if selected_module == "Pulpit":
-  st.markdown('<div class="erp-dashboard-heading">GOTOWOŚĆ DO ROZLICZENIA</div>', unsafe_allow_html=True)
-  _overview_cols = st.columns(4)
-  _overview_cols[0].metric("01 · Harmonogram", "Gotowy" if _step_plan else "Brak")
-  _overview_cols[1].metric("02 · Raport produkcji", "Wgrany" if _step_production else "Brak")
-  _overview_cols[2].metric("03 · Katalog wag", "Wgrany" if _step_weights else "Brak")
-  _overview_cols[3].metric("Etapy przygotowane", f"{sum((_step_plan, _step_production, _step_weights))} / 3")
+  # Progress is presented once in the global ribbon. Pulpit contains actions,
+  # not a duplicate row of big metrics that disappears on other modules.
   st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
   _work_left, _work_right = st.columns([1.5, 1])
   with _work_left:
@@ -848,9 +838,9 @@ if selected_module == "Pulpit":
       st.markdown("**Planowanie i harmonogram**")
       st.caption("Harmonogram można przygotować przed rozpoczęciem miesiąca.")
       if _step_plan:
-        st.success("Harmonogram przypisany do wybranego okresu.")
+        st.info("Harmonogram jest w tej sesji. Zapis i status publikacji sprawdzisz w module Harmonogram.")
       else:
-        st.warning("Przygotuj harmonogram dla tego miesiąca.")
+        st.warning("Nie wczytano harmonogramu tego miesiąca. Otwórz moduł Harmonogram.")
       st.markdown("**Rozliczenie produkcji**")
       if not _step_production:
         st.info("Oczekiwanie na raport produkcji.")
@@ -864,7 +854,7 @@ if selected_module == "Pulpit":
       st.checkbox("Harmonogram dla okresu", value=_step_plan, disabled=True, key="overview_schedule")
       st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
       st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
-      st.caption("Wgranie plików nie oznacza jeszcze zatwierdzenia obliczeń.")
+      st.caption("Są to wyłącznie kroki przygotowawcze. Statusy zapisów i publikacji znajdziesz w pasku etapów na górze każdej zakładki.")
   st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Przed zakończeniem pracy zapisz wersję roboczą u góry strony.</div>', unsafe_allow_html=True)
 
 # ==========================================
