@@ -790,6 +790,10 @@ selected_module = st.sidebar.radio(
     key="erp_selected_module",
 )
 st.sidebar.caption("Wybierz moduł, aby wyświetlić tylko jego zawartość.")
+# Test-only, owner-scoped monthly drafts. No source files or published awards.
+from test_draft_ui import render_draft_controls, autosave_draft
+render_draft_controls(gen_year, gen_month_idx, period_key)
+
 
 # Read category choices only if the user actually edits exclusion settings.
 # Monthly bonus computations use their own cached parser in the calculator.
@@ -2193,4 +2197,7 @@ if selected_module == "Ustawienia":
     if save_persistent_settings(current_settings_to_save):
       st.success("Ustawienia i lista pracowników zostały zapisane w bieżącej sesji testowej.")
 
-
+# Auto-save only after rendering the selected module's current edits.
+# No automatic writes until the administrator explicitly saves/restores a draft
+# and enables the option.
+autosave_draft(gen_year, gen_month_idx, period_key)
