@@ -82,7 +82,7 @@ class PreviewTests(unittest.TestCase):
                 type(st.sidebar), "file_uploader", lambda self, label, *a, **kw: upload(label, *a, **kw)):
             app = AppTest.from_file(APP, default_timeout=45).run()
             self.assertEqual(list(app.exception), [])
-            next(r for r in app.radio if r.label == "Moduł").set_value("Produkcja i premie").run()
+            next(r for r in app.radio if r.label == "Moduł").set_value("Rozliczenie premii").run()
             metrics = {m.label: m.value for m in app.metric}
             self.assertEqual(metrics["Pozycje"], "1")
             self.assertEqual(metrics["Sztuki"], "10")
