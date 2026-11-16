@@ -55,6 +55,7 @@ def render_month_publication(label, archived_period):
         st.error(status.get("error", "Nie można zweryfikować stanu publikacji."))
         return
     if status.get("already_published"):
+        st.session_state.setdefault("_test_payroll_publications", {})[period] = True
         publication = status.get("publication") or {}
         st.success(
             "Okres już opublikowany. Liczba kont: "
@@ -147,6 +148,7 @@ def render_month_publication(label, archived_period):
             "publish", published_period, confirm="PUBLIKUJ", kpis=kpis, employees=rows
         )
         if success:
+            st.session_state.setdefault("_test_payroll_publications", {})[published_period] = True
             st.success("Opublikowano miesiąc i indywidualne paski premiowe.")
             st.rerun()
         else:
