@@ -757,14 +757,9 @@ uploaded_month_file = st.sidebar.file_uploader(
     "Wgraj raport produkcji (Excel):", type=["xlsx", "xls"]
 )
 
-# Odczyt kategorii tylko z przeslanego pliku; nie zapisujemy danych klientow.
+# Category options are needed only in Settings; skip reading and hashing the
+# whole production file while switching between other sidebar modules.
 client_categories_in_file = []
-if uploaded_month_file is not None:
-  try:
-    _production_preview = cached_read_production_v2(uploaded_month_file.getvalue())
-    client_categories_in_file = category_options(_production_preview)
-  except (ValueError, OSError, ImportError) as exc:
-    st.sidebar.warning("Nie mozna odczytac kategorii klientow z pliku.")
 
 uploaded_weights_file = st.sidebar.file_uploader(
     "Aktualna baza wag (Excel .xlsx):", type=["xlsx"], key="current_weights_file"
@@ -795,6 +790,15 @@ selected_module = st.sidebar.radio(
     key="erp_selected_module",
 )
 st.sidebar.caption("Wybierz moduł, aby wyświetlić tylko jego zawartość.")
+
+# Read category choices only if the user actually edits exclusion settings.
+# Monthly bonus computations use their own cached parser in the calculator.
+if selected_module == "Ustawienia" and uploaded_month_file is not None:
+  try:
+    _production_preview = cached_read_production_v2(uploaded_month_file.getvalue())
+    client_categories_in_file = category_options(_production_preview)
+  except (ValueError, OSError, ImportError):
+    st.sidebar.warning("Nie można odczytać kategorii klientów z pliku.")
 
 st.markdown(
     '<div class="work-commandbar">'
