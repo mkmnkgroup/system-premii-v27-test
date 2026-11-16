@@ -248,6 +248,124 @@ def apply_theme(mode):
             .stApp {{background:#fff !important;}}
             .pay-slip {{page-break-inside:avoid;box-shadow:none;}}
         }}
+        /* ERP Optima-inspired workspace: compact ribbon, flat panels, structured grids. */
+        .stApp .block-container {{
+            max-width: 1480px;
+            padding-top: .65rem;
+            padding-bottom: 2rem;
+        }}
+        .stApp [data-testid="stSidebar"] {{
+            min-width: 230px;
+            max-width: 270px;
+            background: var(--premium-surface) !important;
+            box-shadow: none !important;
+        }}
+        .stApp [data-testid="stSidebar"] [data-testid="stRadio"] > div {{
+            gap: .22rem;
+        }}
+        .stApp [data-testid="stSidebar"] [role="radiogroup"] label {{
+            border-radius: 5px;
+            padding: .27rem .4rem;
+            margin: 0;
+            font-size: .83rem;
+        }}
+        .stApp [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {{
+            background: var(--premium-raised);
+            box-shadow: inset 3px 0 0 var(--premium-accent);
+            font-weight: 700;
+        }}
+        .premium-hero {{
+            background: var(--premium-surface) !important;
+            border: 1px solid var(--premium-border) !important;
+            border-top: 3px solid var(--premium-accent) !important;
+            border-radius: 5px !important;
+            padding: 9px 16px !important;
+            margin: 3px 0 8px !important;
+            box-shadow: none !important;
+        }}
+        .premium-hero h1 {{
+            color: var(--premium-text) !important;
+            font-size: 1.16rem !important;
+            font-weight: 750;
+            margin: .08rem 0 !important;
+            letter-spacing: -.012em !important;
+        }}
+        .premium-hero p {{
+            color: var(--premium-muted) !important;
+            font-size: .75rem !important;
+        }}
+        .premium-eyebrow {{
+            color: var(--premium-accent) !important;
+            font-size: .59rem !important;
+            letter-spacing: .075em !important;
+        }}
+        .erp-toolbar-label {{
+            color: var(--premium-muted);
+            font-size: .64rem;
+            font-weight: 750;
+            letter-spacing: .07em;
+            margin: 4px 0 6px;
+        }}
+        .work-commandbar {{
+            border-radius: 4px !important;
+            min-height: 32px !important;
+            padding: 6px 11px !important;
+            margin: 9px 0 7px !important;
+            gap: 9px !important;
+            font-size: .75rem !important;
+            box-shadow: none !important;
+        }}
+        .work-record-header {{
+            border-radius: 5px !important;
+            padding: 9px 14px !important;
+            margin-bottom: 10px !important;
+            box-shadow: none !important;
+        }}
+        .work-record-header h2 {{
+            font-size: 1.06rem !important;
+            margin: 0 !important;
+        }}
+        .work-record-header p {{
+            font-size: .73rem !important;
+        }}
+        .work-record-state {{
+            font-size: .72rem !important;
+            border-radius: 5px !important;
+            padding: 4px 7px !important;
+        }}
+        .stApp [data-testid="stMetric"] {{
+            padding: 7px 10px !important;
+            border-radius: 5px !important;
+            box-shadow: none !important;
+        }}
+        .stApp [data-testid="stMetricValue"] {{
+            font-size: 1.2rem !important;
+        }}
+        .stApp div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {{
+            border-radius: 5px;
+            box-shadow: none;
+        }}
+        .stApp div.stButton > button,
+        .stApp div.stDownloadButton > button,
+        .stApp div.stFormSubmitButton > button {{
+            border-radius: 5px !important;
+            font-weight: 600;
+        }}
+        .stApp div[data-baseweb="input"], .stApp div[data-baseweb="select"],
+        .stApp div[data-baseweb="textarea"],
+        .stApp div[data-testid="stDataFrame"] {{
+            border-radius: 5px !important;
+        }}
+        .stApp h1 {{font-size: 1.38rem !important;}}
+        .stApp h2 {{font-size: 1.18rem !important;}}
+        .stApp h3 {{font-size: 1.02rem !important;}}
+        .stApp [data-testid="stWidgetLabel"] p {{font-size: .77rem;}}
+        .stApp [data-testid="stVerticalBlock"] {{gap: .5rem;}}
+        @media(max-width: 760px) {{
+            .stApp .block-container {{padding: .7rem .7rem 2rem;}}
+            .stApp [data-testid="stSidebar"] {{max-width: none;}}
+            .work-record-header {{padding: 9px 11px !important;}}
+        }}
         </style>""",
         unsafe_allow_html=True,
     )
