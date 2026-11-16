@@ -52,11 +52,14 @@ class ErpWorkspaceTests(unittest.TestCase):
             self.assertTrue(any(w.label == "Rok" for w in app.number_input))
             self.assertEqual(app.session_state.premium_ui_mode, "Jasny")
             module = next(r for r in app.radio if r.label == "Moduł")
-            self.assertEqual(
+            # Streamlit AppTest exposes formatted labels, while radio values
+            # remain the unchanged internal module names.
+            for shown, module_name in zip(
                 module.options,
                 ["Pulpit", "Harmonogram", "Produkcja i premie",
                  "Analizy", "Archiwum", "Porównania", "Ustawienia"],
-            )
+            ):
+                self.assertTrue(shown.endswith(module_name), shown)
             module.set_value("Ustawienia").run()
             self.assertEqual(list(app.exception), [])
             module = next(r for r in app.radio if r.label == "Moduł")
