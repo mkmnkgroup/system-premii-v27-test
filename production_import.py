@@ -1,6 +1,5 @@
 """Safe preparation of production KPIs from a current monthly export and weight catalog."""
 import io
-import re
 import pandas as pd
 from client_categories import CLIENT_CATEGORY_COLUMN, exclude_categories
 
@@ -11,11 +10,28 @@ DATE = "Дата перехода в искомое состояние"
 
 
 def parse_production_dates(values):
-    """Preserve ISO year-month-day order while accepting local day-first dates."""
-    def parse(value):
-        iso = isinstance(value, str) and bool(re.match(r'^\s*\d{4}-\d{2}-\d{2}(?:[ T]|$)', value))
-        return pd.to_datetime(value, dayfirst=not iso, errors="coerce")
-    return values.map(parse)
+    """Vectorized mixed-date parser with explicit ISO vs local date order.
+
+    Supplier files mix ISO strings, Polish day-first strings, datetime cells,
+    and blanks. Batch conversion avoids thousands of per-row calls to
+    pd.to_datetime while preserving the original day/month interpretation.
+    """
+    if not isinstance(values, pd.Series):
+        values = pd.Series(values)
+    iso = values.astype("string").str.match(
+        r"^\s*\d{4}-\d{2}-\d{2}(?:[ T]|$)", na=False,
+    )
+    parsed = pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns]")
+    if iso.any():
+        parsed.loc[iso] = pd.to_datetime(
+            values.loc[iso], format="mixed", dayfirst=False, errors="coerce",
+        )
+    local = ~iso
+    if local.any():
+        parsed.loc[local] = pd.to_datetime(
+            values.loc[local], format="mixed", dayfirst=True, errors="coerce",
+        )
+    return parsed
 
 
 def normalize(value):
