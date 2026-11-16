@@ -27,7 +27,7 @@ from premium_theme import apply_theme, hero
 from employee_excel import read_employees_excel, write_employees_excel
 from bonus_slip_pdf import generate_bonus_slip_pdf
 
-if "premium_ui_mode" not in st.session_state:
+if st.session_state.get("premium_ui_mode") not in ("Ciemny", "Jasny"):
   st.session_state.premium_ui_mode = "Jasny"
 
 with st.sidebar:
@@ -36,7 +36,7 @@ with st.sidebar:
       options=["Ciemny", "Jasny"],
       key="premium_ui_mode",
   )
-apply_theme(st.session_state.premium_ui_mode)
+apply_theme(st.session_state.premium_ui_mode or "Jasny")
 hero()
 
 # ==========================================
