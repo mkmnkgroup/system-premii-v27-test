@@ -906,7 +906,7 @@ if selected_module == "Harmonogram":
         st.error(f"Błąd odczytu pliku: {e}")
 
   # Eksport i zapis planu pozostają w etapie przygotowania miesiąca.
-  with col_b2:
+  with col_action2:
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
       st.session_state.current_schedule_df.to_excel(
