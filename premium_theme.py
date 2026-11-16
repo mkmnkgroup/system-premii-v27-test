@@ -248,6 +248,87 @@ def apply_theme(mode):
             .stApp {{background:#fff !important;}}
             .pay-slip {{page-break-inside:avoid;box-shadow:none;}}
         }}
+        /* Visible on every module: small status cells replace 4 oversized metrics. */
+        .erp-process {{
+            background: var(--premium-surface);
+            border: 1px solid var(--premium-border);
+            border-radius: 5px;
+            padding: 7px 10px;
+            margin: 6px 0 10px;
+            box-shadow: none;
+        }}
+        .erp-process-heading {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+            color: var(--premium-text);
+            font-size: .69rem;
+            letter-spacing: .04em;
+        }}
+        .erp-process-heading span {{
+            color: var(--premium-muted);
+            letter-spacing: 0;
+            font-weight: 500;
+        }}
+        .erp-process-list {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 5px;
+        }}
+        .erp-process-step {{
+            background: var(--premium-bg);
+            border: 1px solid var(--premium-border);
+            border-left: 3px solid var(--premium-border);
+            border-radius: 4px;
+            padding: 5px 8px;
+            min-width: 0;
+        }}
+        .erp-process-step--done {{ border-left-color: #169262; }}
+        .erp-process-step--working {{ border-left-color: var(--premium-accent); }}
+        .erp-process-step-title {{
+            font-size: .70rem;
+            font-weight: 650;
+            color: var(--premium-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        .erp-process-step-title span {{
+            font-size: .57rem;
+            color: var(--premium-muted);
+            padding-right: 4px;
+        }}
+        .erp-process-step-status {{
+            font-size: .67rem;
+            line-height: 1.2;
+            margin-top: 3px;
+            color: var(--premium-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        .erp-process-step--done .erp-process-step-status {{
+            color: #168057;
+        }}
+        .erp-process-step--working .erp-process-step-status {{
+            color: var(--premium-accent);
+        }}
+        .erp-process-note {{
+            margin-top: 6px;
+            color: var(--premium-muted);
+            font-size: .65rem;
+        }}
+        @media (max-width: 1000px) {{
+            .erp-process-list {{grid-template-columns: repeat(2, minmax(0, 1fr));}}
+        }}
+        @media (max-width: 500px) {{
+            .erp-process-list {{grid-template-columns: repeat(2, minmax(0, 1fr));}}
+            .erp-process-step {{padding: 5px 6px;}}
+            .erp-process-step-title {{font-size: .64rem;}}
+            .erp-process-step-status {{font-size: .62rem;}}
+        }}
         /* ERP Optima-inspired workspace: compact ribbon, flat panels, structured grids. */
         .stApp .block-container {{
             max-width: 1480px;
