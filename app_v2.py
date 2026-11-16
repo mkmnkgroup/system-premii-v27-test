@@ -30,12 +30,6 @@ from bonus_slip_pdf import generate_bonus_slip_pdf
 if st.session_state.get("premium_ui_mode") not in ("Ciemny", "Jasny"):
   st.session_state.premium_ui_mode = "Jasny"
 
-with st.sidebar:
-  st.segmented_control(
-      "Wygląd aplikacji",
-      options=["Ciemny", "Jasny"],
-      key="premium_ui_mode",
-  )
 apply_theme(st.session_state.premium_ui_mode or "Jasny")
 hero()
 
@@ -724,47 +718,50 @@ def calculate_payroll(
 
 
 # ==========================================
-# PASEK BOCZNY
+# GŁÓWNY OBSZAR ROBOCZY - okres i import poza lewym menu.
+# Rozmieszczenie inspirowane klasycznym układem ERP.
 # ==========================================
-st.sidebar.markdown("#### ◈ System Premii 2.7")
-st.sidebar.caption("CENTRUM OPERACYJNE · WERSJA TESTOWA")
-st.sidebar.markdown("**OKRES PRACY**")
 months_list = [
-    "Styczeń",
-    "Luty",
-    "Marzec",
-    "Kwiecień",
-    "Maj",
-    "Czerwiec",
-    "Lipiec",
-    "Sierpień",
-    "Wrzesień",
-    "Październik",
-    "Listopad",
-    "Grudzień",
+    "Styczeń", "Luty", "Marzec", "Kwiecień",
+    "Maj", "Czerwiec", "Lipiec", "Sierpień",
+    "Wrzesień", "Październik", "Listopad", "Grudzień",
 ]
-gen_month_name = st.sidebar.selectbox(
-    "Miesiąc:", months_list, index=datetime.now().month - 1
-)
+st.markdown('<div class="erp-toolbar-label">PARAMETRY BIEŻĄCEGO DOKUMENTU</div>', unsafe_allow_html=True)
+with st.container(border=True):
+  _period_col_month, _period_col_year, _period_col_theme = st.columns([2.4, 1.2, 1.1])
+  with _period_col_month:
+    gen_month_name = st.selectbox(
+        "Miesiąc rozliczenia", months_list, index=datetime.now().month - 1,
+        key="erp_period_month",
+    )
+  with _period_col_year:
+    gen_year = st.number_input(
+        "Rok", min_value=2020, max_value=2100,
+        value=datetime.now().year, step=1, key="erp_period_year",
+    )
+  with _period_col_theme:
+    st.caption("WIDOK")
+    with st.popover("Wygląd"):
+      st.segmented_control(
+          "Motyw aplikacji", options=["Jasny", "Ciemny"],
+          key="premium_ui_mode",
+      )
 gen_month_idx = months_list.index(gen_month_name) + 1
-gen_year = st.sidebar.number_input("Rok:", value=datetime.now().year, step=1)
 period_key = f"{gen_month_name} {gen_year}"
 
-st.sidebar.caption("Harmonogram utworzysz lub zmienisz w module Harmonogram.")
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("**PLIKI DO ROZLICZENIA**")
-uploaded_month_file = st.sidebar.file_uploader(
-    "Wgraj raport produkcji (Excel):", type=["xlsx", "xls"]
-)
-
-# Category options are needed only in Settings; skip reading and hashing the
-# whole production file while switching between other sidebar modules.
+with st.expander("📁 Dane źródłowe do rozliczenia · raport i katalog wag", expanded=False):
+  st.caption("Wgraj pliki przed naliczaniem premii. Po utracie sesji pliki trzeba wgrać ponownie.")
+  _report_col, _weights_col = st.columns(2)
+  with _report_col:
+    uploaded_month_file = st.file_uploader(
+        "Wgraj raport produkcji (Excel):", type=["xlsx", "xls"],
+    )
+  with _weights_col:
+    uploaded_weights_file = st.file_uploader(
+        "Aktualna baza wag (Excel .xlsx):", type=["xlsx"],
+        key="current_weights_file",
+    )
 client_categories_in_file = []
-
-uploaded_weights_file = st.sidebar.file_uploader(
-    "Aktualna baza wag (Excel .xlsx):", type=["xlsx"], key="current_weights_file"
-)
 
 # Initialize the first period before computing its readiness.
 if "schedule_period_key" not in st.session_state:
@@ -778,19 +775,29 @@ _schedule_matches_period = (
 )
 
 # ==========================================
-# PANEL PROCESU - planowanie jest dostępne przed rozpoczęciem miesiąca.
+# LEWY PANEL - WYŁĄCZNIE MENU MODUŁÓW W KOLEJNOŚCI PRACY.
 # ==========================================
-# Power Apps-inspired command bar and compact record header.
-# Compact warehouse operations overview, without fabricated production KPIs.
-st.sidebar.markdown("---")
-st.sidebar.markdown("**NAWIGACJA**")
+st.sidebar.markdown("#### ◈ System Premii 2.7")
+st.sidebar.caption("MODUŁY · WERSJA TESTOWA")
+_sidebar_nav_labels = {
+    "Pulpit": "01  Pulpit",
+    "Harmonogram": ("✓ " if _schedule_matches_period else "02  ") + "Harmonogram",
+    "Produkcja i premie": (
+        "✓ " if uploaded_month_file is not None and uploaded_weights_file is not None
+        else "03  "
+    ) + "Produkcja i premie",
+    "Analizy": "04  Analizy",
+    "Archiwum": ("✓ " if period_key in st.session_state.history_v2 else "05  ") + "Archiwum",
+    "Porównania": "06  Porównania",
+    "Ustawienia": "07  Ustawienia",
+}
 selected_module = st.sidebar.radio(
     "Moduł",
     ["Pulpit", "Harmonogram", "Produkcja i premie", "Analizy", "Archiwum", "Porównania", "Ustawienia"],
     label_visibility="collapsed",
+    format_func=lambda name: _sidebar_nav_labels[name],
     key="erp_selected_module",
 )
-st.sidebar.caption("Wybierz moduł, aby wyświetlić tylko jego zawartość.")
 # Test-only, owner-scoped monthly drafts. No source files or published awards.
 from test_draft_ui import render_draft_controls, autosave_draft
 render_draft_controls(gen_year, gen_month_idx, period_key)
@@ -803,7 +810,7 @@ if selected_module == "Ustawienia" and uploaded_month_file is not None:
     _production_preview = cached_read_production_v2(uploaded_month_file.getvalue())
     client_categories_in_file = category_options(_production_preview)
   except (ValueError, OSError, ImportError):
-    st.sidebar.warning("Nie można odczytać kategorii klientów z pliku.")
+    st.warning("Nie można odczytać kategorii klientów z pliku.")
 
 st.markdown(
     '<div class="work-commandbar">'
