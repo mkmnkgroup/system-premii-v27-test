@@ -124,6 +124,60 @@ class GatewayRefreshIntegrationTests(unittest.TestCase):
         app.session_state["_test_auth_expires_at"] = 1
         return app
 
+    def test_password_login_accepts_only_complete_supabase_session(self):
+        app = AppTest.from_file(APP, default_timeout=45)
+        self.assertFalse(list(app.run().exception))
+
+        def api(method, path, **kwargs):
+            if path == "/auth/v1/token?grant_type=password":
+                return 200, payload()
+            if path == "/auth/v1/user":
+                return 200, {"id": "synthetic-admin", "email": "admin@example.invalid"}
+            if path.startswith("/rest/v1/app_user_profiles?"):
+                return 200, [{"user_id": "synthetic-admin", "role": "admin",
+                              "enabled": True, "employee_id": None}]
+            return 204, {}
+
+        with patch("app_auth._request", side_effect=api):
+            app.text_input[0].set_value("admin@example.invalid")
+            app.text_input[1].set_value("synthetic-demo-password")
+            next(b for b in app.button if b.label == "Zaloguj się").click().run()
+        self.assertFalse(list(app.exception))
+        self.assertEqual(app.session_state["_test_auth_access_token"], NEW_ACCESS)
+        self.assertEqual(app.session_state["_test_auth_refresh_token"], NEW_REFRESH)
+        self.assertTrue(any(r.label == "Moduł" for r in app.radio))
+
+    def test_password_login_fails_closed_without_refresh_token(self):
+        app = AppTest.from_file(APP, default_timeout=45).run()
+        with patch("app_auth._request",
+                   return_value=(200, {"access_token": NEW_ACCESS, "expires_in": 3600})):
+            app.text_input[0].set_value("admin@example.invalid")
+            app.text_input[1].set_value("synthetic-demo-password")
+            next(b for b in app.button if b.label == "Zaloguj się").click().run()
+        self.assertFalse(list(app.exception))
+        for key in TOKEN_KEYS:
+            self.assertNotIn(key, app.session_state)
+        self.assertEqual(list(app.radio), [])
+
+    def test_revoked_role_after_refresh_clears_entire_workspace(self):
+        app = self._app()
+        app.session_state["employees_df"] = pd.DataFrame({"OSOBA": ["OLD SECRET"]})
+        def api(method, path, **kwargs):
+            if path.endswith("grant_type=refresh_token"):
+                return 200, payload()
+            if path == "/auth/v1/user":
+                return 200, {"id": "synthetic-admin"}
+            if path.startswith("/rest/v1/app_user_profiles?"):
+                return 200, [{"user_id": "synthetic-admin", "role": "admin",
+                              "enabled": False}]
+            return 204, {}
+        with patch("app_auth._request", side_effect=api):
+            app.run()
+        self.assertFalse(list(app.exception))
+        for key in (*TOKEN_KEYS, "employees_df"):
+            self.assertNotIn(key, app.session_state)
+        self.assertEqual(list(app.radio), [])
+
     def test_expired_access_refreshes_and_revalidates_role(self):
         app = self._app()
         with patch("app_auth._request", side_effect=valid_auth_api) as request:
