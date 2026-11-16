@@ -9,6 +9,7 @@ import streamlit.components.v1 as components
 import requests
 import streamlit as st
 from auth_rules import active_role, allowed_module, bind_user_session, clear_user_session
+from auth_session import clear_auth_tokens, store_auth_tokens, session_needs_refresh, refresh_auth_tokens
 
 _recovery_callback = components.declare_component(
     "test_password_recovery", path=str(Path(__file__).parent / "recovery_component"))
@@ -60,7 +61,7 @@ def _password_recovery():
         st.session_state["_test_last_recovery_transfer"] = callback["transfer_id"]
         st.session_state["_test_recovery_token"] = callback["access_token"]
         st.session_state["_test_recovery_open"] = True
-        st.session_state.pop("_test_auth_access_token", None)
+        clear_auth_tokens(st.session_state)
         st.rerun()
     if not st.session_state.get("_test_recovery_open"):
         return
@@ -81,7 +82,7 @@ def _password_recovery():
             st.session_state.pop("_test_recovery_hash", None)
             if status == 200 and result.get("access_token"):
                 st.session_state["_test_recovery_token"] = result["access_token"]
-                st.session_state.pop("_test_auth_access_token", None)
+                clear_auth_tokens(st.session_state)
                 st.rerun()
             st.error("Link jest nieprawidłowy lub wygasł. Poproś o nową wiadomość.")
         st.stop()
@@ -146,8 +147,22 @@ def login_gate():
     if st.session_state.pop("_test_password_changed", False):
         st.success("Hasło zostało zmienione. Zaloguj się nowym hasłem.")
     token = st.session_state.get("_test_auth_access_token")
+    if token and session_needs_refresh(st.session_state):
+        if refresh_auth_tokens(st.session_state, _request):
+            token = st.session_state["_test_auth_access_token"]
+        else:
+            clear_user_session(st.session_state)
+            token = None
     if token:
         status, user = _request("GET", "/auth/v1/user", token=token)
+        # Supabase may reject a token even before local expiry; refresh once.
+        if status in (401, 403) and st.session_state.get("_test_auth_refresh_token"):
+            if refresh_auth_tokens(st.session_state, _request):
+                token = st.session_state["_test_auth_access_token"]
+                status, user = _request("GET", "/auth/v1/user", token=token)
+            else:
+                clear_user_session(st.session_state)
+                token = None
         if status == 200 and user.get("id"):
             status, profiles = _request(
                 "GET", "/rest/v1/app_user_profiles?select=user_id,role,enabled,employee_id&user_id=eq." + user["id"],
@@ -159,7 +174,7 @@ def login_gate():
                 st.sidebar.write("Zalogowano:", user.get("email", ""))
                 st.sidebar.write("Rola:", role)
                 if st.sidebar.button("Wyloguj", key="_test_logout"):
-                    _request("POST", "/auth/v1/logout", token=token)
+                    _request("POST", "/auth/v1/logout?scope=local", token=token)
                     clear_user_session(st.session_state)
                     st.rerun()
                 if allowed_module(role, "test_workspace"):
@@ -189,10 +204,12 @@ def login_gate():
     if submit:
         status, data = _request("POST", "/auth/v1/token?grant_type=password",
                                 data={"email": email.strip(), "password": password})
-        if status == 200 and data.get("access_token"):
+        if status == 200:
             clear_user_session(st.session_state)
-            st.session_state["_test_auth_access_token"] = data["access_token"]
-            st.rerun()
+            if store_auth_tokens(st.session_state, data):
+                st.rerun()
+            clear_user_session(st.session_state)
+            st.error("Nie udało się utworzyć bezpiecznej sesji. Spróbuj ponownie.")
         else:
             st.error("Nieprawidłowe dane logowania lub konto nie jest aktywne.")
     st.stop()
