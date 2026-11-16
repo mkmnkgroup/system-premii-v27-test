@@ -52,7 +52,7 @@ def render_draft_controls(year, month, period_key):
         except DraftError:
             metadata[period] = {"error": True}
     meta = metadata[period]
-    with st.sidebar.expander("💾 Wersja robocza miesiąca", expanded=False):
+    with st.expander("💾 Wersja robocza miesiąca", expanded=False):
         st.caption("Przechowywana bezpiecznie dla tego konta i miesiąca. "
                    "Bez raportów źródłowych i bez publikowania premii.")
         if meta.get("error"):
