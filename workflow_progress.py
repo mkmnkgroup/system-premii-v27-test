@@ -1,85 +1,119 @@
-"""A truthful, compact process overview shared by every ERP module.
+"""Read-only, month-scoped progress ribbon for the warehouse payroll workflow.
 
-The strip shows only evidence available in the *current authenticated session*.
-It never treats an automatically generated schedule, uploaded source files, or
-a saved payroll archive as proof that employee-facing publication occurred.
+Statuses are evidence-based and do not interpret an uploaded Excel file, an
+automatically generated schedule, or an archive as publication to employees.
 """
 from html import escape
 
 
 def _saved_revision(state, year, month, stage):
     key = f"_test_saved_draft_revision_draft_v27_{year:04d}-{month:02d}_{stage}"
-    revision = state.get(key)
-    return isinstance(revision, int) and not isinstance(revision, bool) and revision > 0
+    value = state.get(key)
+    return type(value) is int and value > 0
 
 
 def workflow_steps(state, *, year, month, period_label,
                    schedule_loaded, production_loaded, weights_loaded):
-    """Return statuses for the selected month, with no network or database writes."""
-    month_key = f"{int(year):04d}-{int(month):02d}-01"
+    """Describe monthly workflow in the actual business order; no network I/O."""
     year, month = int(year), int(month)
+    month_key = f"{year:04d}-{month:02d}-01"
     schedule_saved = _saved_revision(state, year, month, "schedule")
     attendance_saved = _saved_revision(state, year, month, "attendance")
-    archived = period_label in state.get("history_v2", {})
-    attendance_publication = state.get("_test_attendance_publications", {}).get(month_key)
-    payroll_publication = state.get("_test_payroll_publications", {}).get(month_key)
-    attendance_done = attendance_publication is True
-    payroll_done = payroll_publication is True
+    extras_saved = state.get("_bonus_inputs_confirmed_by_period", {}).get(period_label) is True
+    extras_present = period_label in state.get("_bonus_inputs_by_period", {})
+    archive = state.get("history_v2", {})
+    archived = period_label in archive
+    publication_attendance = state.get("_test_attendance_publications", {}).get(month_key) is True
+    publication_bonus = state.get("_test_payroll_publications", {}).get(month_key) is True
 
     if schedule_saved:
-        plan = ("Szkic zapisany", "done",
-                "Zapis harmonogramu potwierdzony w tej sesji; nie oznacza publikacji.")
+        plan = ("Zapisany szkic", "done",
+                "Zapis harmonogramu tego miesiąca potwierdzony w bieżącej sesji.")
     elif schedule_loaded:
-        plan = ("Roboczy w sesji", "working",
-                "Harmonogram jest w pamięci aplikacji, ale zapis w bazie nie został potwierdzony.")
+        plan = ("W przygotowaniu", "working",
+                "Harmonogram utworzono lub wczytano lokalnie; zapis w bazie wymaga potwierdzenia.")
     else:
-        plan = ("Nie wczytano", "pending",
-                "W tej sesji nie ma harmonogramu wybranego miesiąca.")
+        plan = ("Do zaplanowania", "pending",
+                "Można przygotować przed rozpoczęciem miesiąca.")
 
-    if attendance_done:
-        attendance = ("Opublikowana", "done",
-                      "Publikacja ewidencji potwierdzona przez usługę testową.")
-    elif attendance_saved:
-        attendance = ("Szkic zapisany", "working",
-                      "W bazie zapisano szkic ewidencji; nie opublikowano jej w tej sesji.")
+    if attendance_saved:
+        attendance = ("Zapisana ewidencja", "done",
+                      "Szkic wejść, wyjść, nieobecności i nadgodzin zapisano; publikacja jest osobna.")
+    elif schedule_loaded:
+        attendance = ("Do potwierdzenia", "working",
+                      "Uzupełnij faktyczne wejścia, wyjścia, nieobecności i nadgodziny.")
     else:
-        attendance = ("Do potwierdzenia", "pending",
-                      "Sprawdź wejścia, wyjścia i nieobecności; zapisz szkic ewidencji.")
+        attendance = ("Oczekuje", "pending", "Najpierw przygotuj harmonogram.")
 
-    if production_loaded and weights_loaded:
-        production = ("Pliki wgrane", "working",
-                      "Raport i katalog wag są w sesji; samo wgranie nie potwierdza poprawności.")
-    elif production_loaded or weights_loaded:
-        production = ("Niekompletne", "working",
-                      "Do rozliczenia potrzebne są zarówno raport produkcji, jak i katalog wag.")
+    if extras_saved:
+        extras = ("Dodatki zapisane", "done",
+                  "Zatwierdzono dane wózka, palet i premii specjalnych dla tego miesiąca.")
+    elif extras_present:
+        extras = ("Do zatwierdzenia", "working",
+                  "Wartości robocze nie są potwierdzone przyciskiem zapisu dodatków.")
     else:
-        production = ("Brak plików", "pending",
-                      "W tej sesji nie wgrano raportu produkcji ani katalogu wag.")
+        extras = ("Do wprowadzenia", "pending",
+                  "Wprowadź godziny wózka, liczbę palet i premie specjalne.")
 
     if archived:
-        payroll = ("W archiwum", "done",
-                   "Rozliczenie zapisano do archiwum sesji; nie jest to publikacja dla pracowników.")
+        production = ("Uwzględniono", "done",
+                      "W tej sesji istnieje zapisane rozliczenie. Nowy raport wymaga ponownej kontroli.")
+    elif production_loaded and weights_loaded:
+        production = ("Pliki wgrane", "working",
+                      "Wgrano raport i katalog wag; poprawność sprawdza dopiero kalkulator.")
+    elif production_loaded or weights_loaded:
+        production = ("Niekompletne", "working",
+                      "Do obliczeń potrzebny jest raport produkcji i katalog wag.")
     else:
-        payroll = ("Do rozliczenia", "pending",
-                   "Brak zapisanego rozliczenia dla wybranego miesiąca w tej sesji.")
+        production = ("Po zamknięciu miesiąca", "pending",
+                      "Po zakończeniu miesiąca wgraj raport produkcji oraz katalog wag.")
 
-    if attendance_done and payroll_done:
-        publication = ("Opublikowano", "done",
-                       "Usługa testowa potwierdziła publikację ewidencji i premii.")
-    elif attendance_done or payroll_done:
-        publication = ("Częściowo", "working",
-                       "Potwierdzono tylko jeden z dwóch rodzajów publikacji.")
+    payroll = (
+        ("Rozliczenie zapisane", "done", "Rozliczenie wyliczono i zapisano do archiwum sesji.")
+        if archived else
+        ("Do przeliczenia", "pending",
+         "Po skompletowaniu ewidencji, dodatków oraz produkcji przelicz premie.")
+    )
+    stored = (
+        ("W archiwum", "done",
+         "Zapis archiwalny jest dostępny; nie oznacza publikacji na kontach pracowników.")
+        if archived else
+        ("Do archiwizacji", "pending",
+         "Zapisz i sprawdź rozliczenie przed udostępnieniem pracownikom.")
+    )
+
+    if publication_attendance and publication_bonus:
+        published = ("Opublikowane", "done",
+                     "W tej sesji serwer potwierdził publikację obecności i premii.")
+    elif publication_attendance or publication_bonus:
+        published = ("Częściowo", "working",
+                     "Potwierdzono tylko jeden rodzaj publikacji; sprawdź drugi.")
     else:
-        publication = ("Do weryfikacji", "pending",
-                       "Brak potwierdzenia publikacji w tej sesji; sprawdź szczegóły w modułach.")
+        published = ("Do weryfikacji", "pending",
+                     "Brak potwierdzonego statusu publikacji w tej sesji. "
+                     "Nie oznacza to, że w bazie nie ma publikacji.")
 
-    entries = [
+    count = len(archive)
+    if count >= 2:
+        reports = ("Dostępne", "working",
+                   "Analizy i porównania co najmniej dwóch rozliczonych miesięcy są dostępne.")
+    elif archived:
+        reports = ("Analizy dostępne", "working",
+                   "Dla porównań potrzebne są co najmniej dwa zapisane okresy.")
+    else:
+        reports = ("Na koniec", "pending",
+                   "Analizy i porównania wykonuje się po zapisaniu rozliczeń.")
+
+    entries = (
         ("Harmonogram", "Harmonogram", plan),
-        ("Ewidencja", "Harmonogram", attendance),
-        ("Raport i wagi", "Produkcja i premie", production),
-        ("Rozliczenie", "Produkcja i premie", payroll),
-        ("Publikacja", "Archiwum", publication),
-    ]
+        ("Ewidencja", "Obecności i nadgodziny", attendance),
+        ("Dodatki", "Dodatki premiowe", extras),
+        ("Raport i wagi", "Rozliczenie premii", production),
+        ("Rozliczenie", "Rozliczenie premii", payroll),
+        ("Archiwum", "Archiwum", stored),
+        ("Publikacja", "Archiwum", published),
+        ("Analizy / porównania", "Analizy", reports),
+    )
     return tuple({
         "title": title,
         "module": module,
@@ -90,29 +124,30 @@ def workflow_steps(state, *, year, month, period_label,
 
 
 def progress_html(steps, period_label):
-    """Static process ribbon; changing a module never changes what 'done' means."""
-    items = []
+    """Compact ribbon visible on every module, not interactive or state-changing."""
+    if not steps:
+        return ""
+    parts = []
     for i, step in enumerate(steps, 1):
-        title = escape(step["title"], quote=True)
-        status = escape(step["status"], quote=True)
-        desc = escape(step["description"], quote=True)
+        title = escape(str(step["title"]), quote=True)
+        status = escape(str(step["status"]), quote=True)
+        desc = escape(str(step["description"]), quote=True)
         tone = step["tone"]
         if tone not in ("pending", "working", "done"):
             raise ValueError("Nieznany status procesu.")
         marker = "✓" if tone == "done" else "●" if tone == "working" else "○"
-        items.append(
+        parts.append(
             f'<div class="erp-process-step erp-process-step--{tone}" title="{desc}">'
             f'<div class="erp-process-step-title"><span>{i:02d}</span> {title}</div>'
             f'<div class="erp-process-step-status">'
             f'<span aria-hidden="true">{marker}</span> {status}</div></div>'
         )
-    month = escape(str(period_label), quote=True)
     return (
         '<section class="erp-process" aria-label="Postęp rozliczenia wybranego miesiąca">'
-        '<div class="erp-process-heading"><strong>Etapy pracy</strong>'
-        f'<span>{month}</span></div>'
-        '<div class="erp-process-list">' + "".join(items) + '</div>'
-        '<div class="erp-process-note">'
-        'Statusy wynikają z bieżącej sesji i potwierdzonych operacji. '
-        'Szkic i import plików nie oznaczają publikacji.</div></section>'
+        '<div class="erp-process-heading"><strong>ETAPY PRACY</strong>'
+        f'<span>{escape(str(period_label), quote=True)}</span></div>'
+        '<div class="erp-process-list">' + "".join(parts) + '</div>'
+        '<div class="erp-process-note">Zapis szkicu, import plików i publikacja '
+        'pracownikom to trzy różne operacje. Statusy odnoszą się do bieżącej sesji.'
+        '</div></section>'
     )
