@@ -171,20 +171,29 @@ def login_gate():
             if role:
                 if bind_user_session(st.session_state, user["id"]):
                     st.rerun()
-                st.sidebar.write("Zalogowano:", user.get("email", ""))
-                st.sidebar.write("Rola:", role)
-                if st.sidebar.button("Wyloguj", key="_test_logout"):
-                    _request("POST", "/auth/v1/logout?scope=local", token=token)
-                    clear_user_session(st.session_state)
-                    st.rerun()
+                # Konto i akcje operatora są w górnym panelu, nigdy w bocznym menu.
+                _account_left, _account_right = st.columns([7, 2])
+                with _account_right:
+                    with st.popover("👤 Konto operatora", use_container_width=True):
+                        st.caption("Zalogowano: " + str(user.get("email", "")))
+                        st.caption("Rola: " + role)
+                        if st.button("Wyloguj", key="_test_logout", use_container_width=True):
+                            _request("POST", "/auth/v1/logout?scope=local", token=token)
+                            clear_user_session(st.session_state)
+                            st.rerun()
+                        if allowed_module(role, "test_workspace"):
+                            if st.button("👥 Administracja · Użytkownicy", key="_test_admin_button",
+                                         use_container_width=True):
+                                st.session_state["_test_admin_panel"] = True
+                            if st.button("📊 Raporty testowe", key="_test_reports_button",
+                                         use_container_width=True):
+                                st.session_state["_test_reports_panel"] = (
+                                    not st.session_state.get("_test_reports_panel", False)
+                                )
                 if allowed_module(role, "test_workspace"):
-                    if st.sidebar.button("👥 Administracja · Użytkownicy", key="_test_admin_button"):
-                        st.session_state["_test_admin_panel"] = True
                     if st.session_state.get("_test_admin_panel"):
                         from admin_users import render_admin_panel
                         render_admin_panel()
-                    if st.sidebar.button("📊 Raporty testowe", key="_test_reports_button"):
-                        st.session_state["_test_reports_panel"] = not st.session_state.get("_test_reports_panel", False)
                     if st.session_state.get("_test_reports_panel"):
                         from role_views import render_role_dashboard
                         render_role_dashboard(role, user["id"])
