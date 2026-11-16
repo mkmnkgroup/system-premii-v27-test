@@ -20,6 +20,20 @@ TABLE_FIELDS = {
     "current_schedule_df", "employees_df", "imported_absences_df",
     "absence_codes_df", "groups_df", "forklift_hours_df", "special_bonuses_df",
 }
+# Empty DataFrames must retain the columns used by the calculator after restore.
+# The JSON rows representation cannot otherwise preserve empty-table schemas.
+EMPTY_COLUMNS = {
+    "employees_df": [
+        "OSOBA", "GRUPA", "SYSTEM", "STANOWISKO", "FUNKCJA", "UPRAWNIENIA UDT",
+    ],
+    "groups_df": ["Nazwa grupy", "Czas pracy"],
+    "absence_codes_df": ["Oznaczenie", "Rodzaj nieobecności"],
+    "forklift_hours_df": ["OSOBA", "CZAS WÓZKA (godz.)"],
+    "special_bonuses_df": [
+        "Pracownik", "Kwota netto premii", "Powód przyznania premii", "Kto przyznał",
+    ],
+}
+
 SCALARS = (
     "base_bonus_salary", "kierownik_bonus_multiplier", "forklift_pool",
     "rate_pallet", "avg_lines_12m", "w_lines", "avg_pcs_12m", "w_pcs",
@@ -147,7 +161,10 @@ def apply_draft(state, payload, period_key):
     for key, rows in payload["tables"].items():
         if key == "current_schedule_df" and payload["schedule_period_key"] is None:
             continue
-        state[key] = pd.DataFrame(rows)
+        state[key] = (
+            pd.DataFrame(rows) if rows
+            else pd.DataFrame(columns=EMPTY_COLUMNS.get(key))
+        )
     if payload["schedule_period_key"] == period_key:
         state["schedule_period_key"] = period_key
     for key, value in payload["settings"].items():
