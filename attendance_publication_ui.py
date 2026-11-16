@@ -46,6 +46,7 @@ def render_attendance_publication(year, month):
             st.error(status.get("error", "Nie można pobrać statusu publikacji."))
             return
         if status.get("published"):
+            st.session_state.setdefault("_test_attendance_publications", {})[period] = True
             data = status.get("publication") or {}
             st.success(
                 "Ewidencja już opublikowana: "
@@ -114,6 +115,7 @@ def render_attendance_publication(year, month):
                 expected_revision=revision,
             )
             if result_ok:
+                st.session_state.setdefault("_test_attendance_publications", {})[period] = True
                 st.success("Ewidencja została opublikowana pracownikom.")
                 st.rerun()
             else:
