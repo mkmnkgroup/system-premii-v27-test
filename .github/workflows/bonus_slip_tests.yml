@@ -10,6 +10,7 @@ on:
       - "bonus_analysis_cache.py"
       - "tests/test_bonus_slip_generator.py"
       - "tests/test_full_fictional_month.py"
+      - "tests/**"
       - "payslip_pdf.py"
       - "role_views.py"
       - "monthly_publication.py"
@@ -39,6 +40,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "fpdf2>=2.8,<3" "pypdf>=5,<7" "streamlit==1.66.0" "pandas>=2.2,<3" "requests>=2.31,<3" "openpyxl>=3.1,<4"
           python -m pip install "ruff>=0.14,<1"
+          python -m pip install "psycopg[binary]>=3.2,<4" holidays plotly xlrd PyGithub
       - name: Catch undefined names before deployment
         run: |
           ruff check --select F821 app_v2.py bonus_input_form.py bonus_slip_pdf.py bonus_analysis_cache.py
@@ -51,3 +53,5 @@ jobs:
           python -m unittest discover -s tests -p "test_role_views.py" -v
           python -m unittest discover -s tests -p "test_monthly_publication.py" -v
           python -m py_compile app_v2.py month_publication_ui.py monthly_publication.py bonus_input_form.py bonus_analysis_cache.py bonus_slip_pdf.py
+      - name: Run complete Python test suite
+        run: python -m unittest discover -s tests -v
