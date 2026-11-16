@@ -1573,7 +1573,7 @@ def _render_calculator_tab():
     with col_tot1:
       st.metric(
           label="Łączna Kwota Wypłat i Dodatków",
-          value=f"{summary_df['ŁĄCZNA PREMIA / DODATKI (zł)'].sum():,.2f} zł",
+          value=f"{sum(round(float(amount), 2) for amount in summary_df['ŁĄCZNA PREMIA / DODATKI (zł)']):,.2f} zł",
       )
     with col_tot2:
       st.metric(
