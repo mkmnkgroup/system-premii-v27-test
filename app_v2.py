@@ -778,23 +778,32 @@ _schedule_matches_period = (
 # LEWY PANEL - WYŁĄCZNIE MENU MODUŁÓW W KOLEJNOŚCI PRACY.
 # ==========================================
 st.sidebar.markdown("#### ◈ System Premii 2.7")
-st.sidebar.caption("MODUŁY · WERSJA TESTOWA")
+st.sidebar.caption("KOLEJNOŚĆ PRACY · WERSJA TESTOWA")
+_saved_schedule = st.session_state.get(
+    f"_test_saved_draft_revision_draft_v27_{gen_year:04d}-{gen_month_idx:02d}_schedule", 0,
+)
+_saved_attendance = st.session_state.get(
+    f"_test_saved_draft_revision_draft_v27_{gen_year:04d}-{gen_month_idx:02d}_attendance", 0,
+)
+_month_archived = period_key in st.session_state.history_v2
+_bonus_inputs_confirmed = st.session_state.get(
+    "_bonus_inputs_confirmed_by_period", {},
+).get(period_key, False)
 _sidebar_nav_labels = {
-    "Pulpit": "01  Pulpit",
-    "Harmonogram": ("✓ " if _schedule_matches_period else "02  ") + "Harmonogram",
-    # Wgranie plików nie oznacza jeszcze zakończenia naliczania.
-    "Produkcja i premie": (
-        "✓ " if period_key in st.session_state.history_v2
-        else "03  "
-    ) + "Produkcja i premie",
-    "Analizy": "04  Analizy",
-    "Archiwum": ("✓ " if period_key in st.session_state.history_v2 else "05  ") + "Archiwum",
-    "Porównania": "06  Porównania",
-    "Ustawienia": "07  Ustawienia",
+    "Pulpit": "Pulpit",
+    "Harmonogram": ("✓ " if isinstance(_saved_schedule, int) and _saved_schedule > 0 else "01  ") + "Harmonogram",
+    "Obecności i nadgodziny": ("✓ " if isinstance(_saved_attendance, int) and _saved_attendance > 0 else "02  ") + "Obecności i nadgodziny",
+    "Dodatki premiowe": ("✓ " if _bonus_inputs_confirmed else "03  ") + "Dodatki premiowe",
+    "Rozliczenie premii": ("✓ " if _month_archived else "04  ") + "Rozliczenie premii",
+    "Archiwum": ("✓ " if _month_archived else "05  ") + "Archiwum",
+    "Analizy": "06  Analizy",
+    "Porównania": "07  Porównania",
+    "Ustawienia": "Ustawienia",
 }
 selected_module = st.sidebar.radio(
     "Moduł",
-    ["Pulpit", "Harmonogram", "Produkcja i premie", "Analizy", "Archiwum", "Porównania", "Ustawienia"],
+    ["Pulpit", "Harmonogram", "Obecności i nadgodziny", "Dodatki premiowe",
+     "Rozliczenie premii", "Archiwum", "Analizy", "Porównania", "Ustawienia"],
     label_visibility="collapsed",
     format_func=lambda name: _sidebar_nav_labels[name],
     key="erp_selected_module",
@@ -829,21 +838,20 @@ _step_plan = _schedule_matches_period
 _step_production = uploaded_month_file is not None
 _step_weights = uploaded_weights_file is not None
 if selected_module == "Pulpit":
-  # Progress is presented once in the global ribbon. Pulpit contains actions,
-  # not a duplicate row of big metrics that disappears on other modules.
+  # Pulpit shows where to start; the progress ribbon remains visible on every page.
   st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
   _work_left, _work_right = st.columns([1.5, 1])
   with _work_left:
     with st.container(border=True):
       st.markdown("**Planowanie i harmonogram**")
-      st.caption("Harmonogram można przygotować przed rozpoczęciem miesiąca.")
+      st.caption("Harmonogram możesz zaplanować nawet miesiąc wcześniej. Następnie uzupełnij ewidencję obecności i dodatki.")
       if _step_plan:
         st.info("Harmonogram jest w tej sesji. Zapis i status publikacji sprawdzisz w module Harmonogram.")
       else:
         st.warning("Nie wczytano harmonogramu tego miesiąca. Otwórz moduł Harmonogram.")
-      st.markdown("**Rozliczenie produkcji**")
+      st.markdown("**Rozliczenie na koniec miesiąca**")
       if not _step_production:
-        st.info("Oczekiwanie na raport produkcji.")
+        st.info("Po zamknięciu miesiąca wgraj raport produkcji, sprawdź wagi i przelicz premie.")
       elif not _step_weights:
         st.warning("Raport wgrany — uzupełnij katalog wag.")
       else:
@@ -854,7 +862,7 @@ if selected_module == "Pulpit":
       st.checkbox("Harmonogram dla okresu", value=_step_plan, disabled=True, key="overview_schedule")
       st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
       st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
-      st.caption("Są to wyłącznie kroki przygotowawcze. Statusy zapisów i publikacji znajdziesz w pasku etapów na górze każdej zakładki.")
+      st.caption("Statusy wszystkich etapów są na górze. Zapis szkicu nie oznacza publikacji pracownikom.")
   st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Przed zakończeniem pracy zapisz wersję roboczą u góry strony.</div>', unsafe_allow_html=True)
 
 # ==========================================
