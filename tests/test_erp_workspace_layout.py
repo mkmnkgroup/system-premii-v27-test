@@ -54,7 +54,7 @@ class ErpWorkspaceTests(unittest.TestCase):
             app = AppTest.from_file(APP, default_timeout=45).run()
         self.assertEqual(list(app.exception), [])
         self.assertFalse(any("premium-hero" in item.value for item in app.markdown))
-        self.assertFalse(any("WERSJA TESTOWA" in item.message for item in app.warning))
+        self.assertFalse(any("WERSJA TESTOWA" in item.value for item in app.warning))
 
     def test_month_and_year_are_in_workspace_and_module_navigation_survives(self):
         with patch("app_auth.login_gate", return_value=None):
