@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="📈",
 )
 
-from premium_theme import apply_theme, hero
+from premium_theme import apply_theme
 from employee_excel import read_employees_excel, write_employees_excel
 from bonus_slip_pdf import generate_bonus_slip_pdf
 
@@ -31,7 +31,6 @@ if st.session_state.get("premium_ui_mode") not in ("Ciemny", "Jasny"):
   st.session_state.premium_ui_mode = "Jasny"
 
 apply_theme(st.session_state.premium_ui_mode)
-hero()
 
 # ==========================================
 # DANE PUBLICZNEGO PODGLĄDU — ODDZIELNIE DLA KAŻDEJ SESJI
@@ -217,10 +216,6 @@ def process_attendance_photo(image_file, api_key):
 # ==========================================
 # DOMYŚLNE DANE SYSTEMOWE I WCZYTANIE ZAPISANYCH
 # ==========================================
-st.warning("WERSJA TESTOWA — używaj wyłącznie fikcyjnych danych. "
-           "Wersję roboczą zapiszesz i przywrócisz u góry strony; "
-           "pliki źródłowe Excel trzeba ponownie wgrać po utracie sesji. "
-           "Opublikowane rozliczenia nie są częścią wersji roboczej.")
 if "loaded_settings_v27" not in st.session_state:
   st.session_state.loaded_settings_v27 = load_persistent_settings()
 saved_settings = st.session_state.loaded_settings_v27
@@ -777,8 +772,9 @@ _schedule_matches_period = (
 # ==========================================
 # LEWY PANEL - WYŁĄCZNIE MENU MODUŁÓW W KOLEJNOŚCI PRACY.
 # ==========================================
-st.sidebar.markdown("#### ◈ System Premii 2.7")
-st.sidebar.caption("KOLEJNOŚĆ PRACY · WERSJA TESTOWA")
+st.sidebar.markdown("**◈ System Premii 2.7**")
+st.sidebar.caption("TEST · tylko dane fikcyjne")
+st.sidebar.caption("ETAPY PRACY")
 from workflow_progress import workflow_steps, progress_html
 _process_steps = workflow_steps(
     st.session_state,
