@@ -44,6 +44,18 @@ class ErpWorkspaceTests(unittest.TestCase):
                             f"{filename}:{node.lineno} owns a sidebar context",
                         )
 
+    def test_main_workspace_has_no_large_brand_banner_or_test_warning(self):
+        source = (ROOT / "app_v2.py").read_text(encoding="utf-8")
+        self.assertNotIn("hero()", source)
+        self.assertNotIn('st.warning("WERSJA TESTOWA', source)
+        self.assertIn('st.sidebar.markdown("**◈ System Premii 2.7**")', source)
+        self.assertIn('st.sidebar.caption("TEST · tylko dane fikcyjne")', source)
+        with patch("app_auth.login_gate", return_value=None):
+            app = AppTest.from_file(APP, default_timeout=45).run()
+        self.assertEqual(list(app.exception), [])
+        self.assertFalse(any("premium-hero" in item.value for item in app.markdown))
+        self.assertFalse(any("WERSJA TESTOWA" in item.message for item in app.warning))
+
     def test_month_and_year_are_in_workspace_and_module_navigation_survives(self):
         with patch("app_auth.login_gate", return_value=None):
             app = AppTest.from_file(APP, default_timeout=45).run()
