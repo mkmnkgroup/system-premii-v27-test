@@ -1949,7 +1949,9 @@ if selected_module == "Porównania":
           "Wybierz drugi okres:", periods, index=min(1, len(periods) - 1)
       )
 
-    if period_a and period_b:
+    if period_a == period_b:
+      st.info("Wybierz dwa różne miesiące, aby wyświetlić porównanie.")
+    elif period_a and period_b:
       data_a = st.session_state.history_v2[period_a]
       data_b = st.session_state.history_v2[period_b]
 
