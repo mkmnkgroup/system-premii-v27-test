@@ -779,27 +779,18 @@ _schedule_matches_period = (
 # ==========================================
 st.sidebar.markdown("#### ◈ System Premii 2.7")
 st.sidebar.caption("KOLEJNOŚĆ PRACY · WERSJA TESTOWA")
-_saved_schedule = st.session_state.get(
-    f"_test_saved_draft_revision_draft_v27_{gen_year:04d}-{gen_month_idx:02d}_schedule", 0,
+from workflow_progress import workflow_steps, progress_html
+_process_steps = workflow_steps(
+    st.session_state,
+    year=gen_year, month=gen_month_idx, period_label=period_key,
+    schedule_loaded=_schedule_matches_period,
+    production_loaded=uploaded_month_file is not None,
+    weights_loaded=uploaded_weights_file is not None,
 )
-_saved_attendance = st.session_state.get(
-    f"_test_saved_draft_revision_draft_v27_{gen_year:04d}-{gen_month_idx:02d}_attendance", 0,
-)
-_month_archived = period_key in st.session_state.history_v2
-_bonus_inputs_confirmed = st.session_state.get(
-    "_bonus_inputs_confirmed_by_period", {},
-).get(period_key, False)
-_sidebar_nav_labels = {
-    "Pulpit": "Pulpit",
-    "Harmonogram": ("✓ " if isinstance(_saved_schedule, int) and _saved_schedule > 0 else "01  ") + "Harmonogram",
-    "Obecności i nadgodziny": ("✓ " if isinstance(_saved_attendance, int) and _saved_attendance > 0 else "02  ") + "Obecności i nadgodziny",
-    "Dodatki premiowe": ("✓ " if _bonus_inputs_confirmed else "03  ") + "Dodatki premiowe",
-    "Rozliczenie premii": ("✓ " if _month_archived else "04  ") + "Rozliczenie premii",
-    "Archiwum": ("✓ " if _month_archived else "05  ") + "Archiwum",
-    "Analizy": "06  Analizy",
-    "Porównania": "07  Porównania",
-    "Ustawienia": "Ustawienia",
-}
+_sidebar_nav_labels = {"Pulpit": "Pulpit", "Ustawienia": "Ustawienia"}
+for _stage_number, _stage in enumerate(_process_steps, 1):
+  _marker = "✓" if _stage["tone"] == "done" else "○"
+  _sidebar_nav_labels[_stage["module"]] = f"{_stage_number:02d}  {_marker} {_stage['module']}"
 selected_module = st.sidebar.radio(
     "Moduł",
     ["Pulpit", "Harmonogram", "Obecności i nadgodziny", "Dodatki premiowe",
@@ -810,14 +801,6 @@ selected_module = st.sidebar.radio(
 )
 # Compact stage ribbon is visible above every module, not only on Pulpit.
 # A generated local schedule and imported Excel files are not marked as finalized.
-from workflow_progress import workflow_steps, progress_html
-_process_steps = workflow_steps(
-    st.session_state,
-    year=gen_year, month=gen_month_idx, period_label=period_key,
-    schedule_loaded=_schedule_matches_period,
-    production_loaded=uploaded_month_file is not None,
-    weights_loaded=uploaded_weights_file is not None,
-)
 st.markdown(progress_html(_process_steps, period_key), unsafe_allow_html=True)
 
 # Test-only, owner-scoped monthly drafts. No source files or published awards.
@@ -834,36 +817,26 @@ if selected_module == "Ustawienia" and uploaded_month_file is not None:
   except (ValueError, OSError, ImportError):
     st.warning("Nie można odczytać kategorii klientów z pliku.")
 
-_step_plan = _schedule_matches_period
-_step_production = uploaded_month_file is not None
-_step_weights = uploaded_weights_file is not None
+def _open_workflow_module(module):
+  st.session_state.erp_selected_module = module
+
+
 if selected_module == "Pulpit":
-  # Pulpit shows where to start; the progress ribbon remains visible on every page.
   st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
-  _work_left, _work_right = st.columns([1.5, 1])
-  with _work_left:
-    with st.container(border=True):
-      st.markdown("**Planowanie i harmonogram**")
-      st.caption("Harmonogram możesz zaplanować nawet miesiąc wcześniej. Następnie uzupełnij ewidencję obecności i dodatki.")
-      if _step_plan:
-        st.info("Harmonogram jest w tej sesji. Zapis i status publikacji sprawdzisz w module Harmonogram.")
-      else:
-        st.warning("Nie wczytano harmonogramu tego miesiąca. Otwórz moduł Harmonogram.")
-      st.markdown("**Rozliczenie na koniec miesiąca**")
-      if not _step_production:
-        st.info("Po zamknięciu miesiąca wgraj raport produkcji, sprawdź wagi i przelicz premie.")
-      elif not _step_weights:
-        st.warning("Raport wgrany — uzupełnij katalog wag.")
-      else:
-        st.success("Pliki wgrane — sprawdź poprawność danych w kalkulatorze.")
-  with _work_right:
-    with st.container(border=True):
-      st.markdown("**Kolejne czynności**")
-      st.checkbox("Harmonogram dla okresu", value=_step_plan, disabled=True, key="overview_schedule")
-      st.checkbox("Raport produkcji", value=_step_production, disabled=True, key="overview_production")
-      st.checkbox("Katalog wag", value=_step_weights, disabled=True, key="overview_weights")
-      st.caption("Statusy wszystkich etapów są na górze. Zapis szkicu nie oznacza publikacji pracownikom.")
-  st.markdown('<div class="erp-module-note">Przejdź do modułu poniżej, aby wykonać szczegółowe czynności. Przed zakończeniem pracy zapisz wersję roboczą u góry strony.</div>', unsafe_allow_html=True)
+  _next_step = next((step for step in _process_steps[:5] if step["tone"] != "done"), _process_steps[5])
+  with st.container(border=True):
+    st.markdown(f"#### Następny krok: {_next_step['title']}")
+    st.write(_next_step["description"])
+    st.button(
+        "Przejdź: " + _next_step["module"], type="primary",
+        on_click=_open_workflow_module, args=(_next_step["module"],),
+        key="dashboard_next_step",
+    )
+  st.caption(
+      "Przed miesiącem przygotuj harmonogram. W trakcie uzupełniaj obecności, "
+      "nadgodziny oraz dodatki: wózek → palety → premie specjalne. "
+      "Po miesiącu wgraj raport i wagi, przelicz premie, zapisz archiwum i przejdź do analiz."
+  )
 
 # ==========================================
 # ZAKŁADKA 1: HARMONOGRAM I SKANER

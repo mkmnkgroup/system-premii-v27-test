@@ -93,26 +93,30 @@ def workflow_steps(state, *, year, month, period_label,
                      "Brak potwierdzonego statusu publikacji w tej sesji. "
                      "Nie oznacza to, że w bazie nie ma publikacji.")
 
-    count = len(archive)
-    if count >= 2:
-        reports = ("Dostępne", "working",
-                   "Analizy i porównania co najmniej dwóch rozliczonych miesięcy są dostępne.")
-    elif archived:
-        reports = ("Analizy dostępne", "working",
-                   "Dla porównań potrzebne są co najmniej dwa zapisane okresy.")
-    else:
-        reports = ("Na koniec", "pending",
-                   "Analizy i porównania wykonuje się po zapisaniu rozliczeń.")
-
+    analyses = (
+        ("Dostępne", "working", "Analiza zapisanego rozliczenia wybranego miesiąca.")
+        if archived else
+        ("Po rozliczeniu", "pending", "Najpierw zapisz rozliczenie wybranego miesiąca.")
+    )
+    comparisons = (
+        ("Dostępne", "working", "Wybierz dwa różne miesiące do porównania.")
+        if len(archive) >= 2 else
+        ("Potrzebne 2 miesiące", "pending", "Zapisz rozliczenia co najmniej dwóch różnych miesięcy.")
+    )
+    # The same seven stages appear in the sidebar and the ribbon. Source files
+    # belong to settlement; publication remains a separate action in Archive.
+    settlement = payroll if archived else production
+    if not archived and production_loaded and weights_loaded:
+        settlement = ("Do sprawdzenia i przeliczenia", "working", production[2] + " " + payroll[2])
+    archive_stage = (stored[0], stored[1], stored[2] + " Publikacja: " + published[0].lower() + ". " + published[2])
     entries = (
         ("Harmonogram", "Harmonogram", plan),
-        ("Ewidencja", "Obecności i nadgodziny", attendance),
-        ("Dodatki", "Dodatki premiowe", extras),
-        ("Raport i wagi", "Rozliczenie premii", production),
-        ("Rozliczenie", "Rozliczenie premii", payroll),
-        ("Archiwum", "Archiwum", stored),
-        ("Publikacja", "Archiwum", published),
-        ("Analizy / porównania", "Analizy", reports),
+        ("Obecności i nadgodziny", "Obecności i nadgodziny", attendance),
+        ("Dodatki premiowe", "Dodatki premiowe", extras),
+        ("Rozliczenie premii", "Rozliczenie premii", settlement),
+        ("Archiwum", "Archiwum", archive_stage),
+        ("Analizy", "Analizy", analyses),
+        ("Porównania", "Porównania", comparisons),
     )
     return tuple({
         "title": title,

@@ -103,8 +103,6 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
     st.session_state.forklift_hours_df = saved["forklift"].copy()
     st.session_state.special_bonuses_df = saved["specials"].copy()
 
-    st.markdown("---")
-    st.subheader("3–5. Dodatki do premii")
     st.info(
         "Uzupełnij wszystkie trzy części formularza. Zmiany nie są liczone "
         "przy każdym wpisanym znaku — użyj przycisku **Zapisz i przelicz dodatki**."
