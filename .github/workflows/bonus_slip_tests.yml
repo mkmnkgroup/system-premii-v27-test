@@ -7,6 +7,8 @@ on:
       - "bonus_components.py"
       - "bonus_slip_pdf.py"
       - "bonus_input_form.py"
+      - "help_ui.py"
+      - "workflow_help.py"
       - "bonus_analysis_cache.py"
       - "test_draft_persistence.py"
       - "test_draft_ui.py"
