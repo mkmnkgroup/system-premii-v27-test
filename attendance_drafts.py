@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from test_schedule_drafts import _request, _slot, draft_item_key, safe_period
+from planned_attendance import BASIS_COLUMN, PLANNED_BASIS, MANUAL_BASIS
 
 
 ATTENDANCE_FIELDS = (
@@ -123,10 +124,13 @@ def build_attendance_payload(schedule, year, month):
         time_in = _time(row.get("FAKTYCZNIE WEJŚCIE", ""), "faktyczne wejście")
         time_out = _time(row.get("FAKTYCZNIE WYJŚCIE", ""), "faktyczne wyjście")
         overtime = _hours(row.get("NADGODZINY (godz.)", 0.0))
+        basis = _optional_text(row.get(BASIS_COLUMN, ""), "podstawa ewidencji", 80)
+        if basis not in ("", PLANNED_BASIS, MANUAL_BASIS):
+            raise AttendanceDraftError("Nieznana podstawa wpisu obecności.")
         entries.append({
             "employee": name, "work_day": day, "day_type": day_type,
             "absence": absence, "time_in": time_in, "time_out": time_out,
-            "overtime_h": overtime,
+            "overtime_h": overtime, "basis": basis,
         })
     return {"format_version": 1, "period": period, "entries": entries}
 
@@ -141,8 +145,12 @@ def attendance_summary(payload):
         r["absence"] in ("Brak", "") and not (r["time_in"] and r["time_out"])
         for r in planned
     )
+    assumed = sum(
+        r.get("basis") == PLANNED_BASIS and bool(r["time_in"] and r["time_out"])
+        for r in planned
+    )
     return {"planned": len(planned), "confirmed": confirmed,
-            "absent_entries": absence, "unconfirmed": unconfirmed}
+            "assumed": assumed, "absent_entries": absence, "unconfirmed": unconfirmed}
 
 
 def restore_attendance_payload(schedule, payload, year, month):
@@ -168,28 +176,34 @@ def restore_attendance_payload(schedule, payload, year, month):
             time_in = _time(item["time_in"], "faktyczne wejście")
             time_out = _time(item["time_out"], "faktyczne wyjście")
             overtime = _hours(item["overtime_h"])
+            basis = _optional_text(item.get("basis", ""), "podstawa ewidencji", 80)
+            if basis not in ("", PLANNED_BASIS, MANUAL_BASIS):
+                raise AttendanceDraftError("Nieznana podstawa wpisu obecności.")
         except KeyError:
             raise AttendanceDraftError("Niekompletny zapis obecności.") from None
         key = (name.casefold(), day)
         if key in saved:
             raise AttendanceDraftError("Zapis zawiera powtórzone dni.")
-        saved[key] = (day_type, absence, time_in, time_out, overtime)
+        saved[key] = (day_type, absence, time_in, time_out, overtime, basis)
 
     result = schedule.copy(deep=True)
     for col in ATTENDANCE_FIELDS:
         if col not in result.columns:
             result[col] = "" if col != "NADGODZINY (godz.)" else 0.0
+    if BASIS_COLUMN not in result.columns:
+        result[BASIS_COLUMN] = ""
     for index, row in result.iterrows():
         key = (_name(row["OSOBA"]).casefold(), _day(row["DATA"], period))
         if key not in saved:
             raise AttendanceDraftError("Zapis zawiera innego pracownika lub datę.")
-        day_type, absence, time_in, time_out, overtime = saved.pop(key)
+        day_type, absence, time_in, time_out, overtime, basis = saved.pop(key)
         if day_type != row["DZIEŃ PRACUJĄCY/WOLNY"]:
             raise AttendanceDraftError("Zmienił się plan pracy. Przywróć najpierw właściwy harmonogram.")
         result.at[index, "NIEOBECNOŚĆ"] = absence
         result.at[index, "FAKTYCZNIE WEJŚCIE"] = time_in
         result.at[index, "FAKTYCZNIE WYJŚCIE"] = time_out
         result.at[index, "NADGODZINY (godz.)"] = overtime
+        result.at[index, BASIS_COLUMN] = basis
     if saved:
         raise AttendanceDraftError("Zapis zawiera nadmiarowe wpisy.")
     return result
@@ -214,11 +228,12 @@ def render_attendance_draft(year, month, display_period):
         st.warning(str(exc))
         return
 
-    a, b, c, d = st.columns(4)
+    a, b, c, d, e = st.columns(5)
     a.metric("Dni planowane", stats["planned"])
-    b.metric("Potwierdzone wejście/wyjście", stats["confirmed"])
-    c.metric("Wpisy nieobecności", stats["absent_entries"])
-    d.metric("Niepotwierdzone dni", stats["unconfirmed"])
+    b.metric("Godziny wpisane", stats["confirmed"])
+    c.metric("Zgodnie z planem", stats["assumed"])
+    d.metric("Nieobecności", stats["absent_entries"])
+    e.metric("Niepotwierdzone dni", stats["unconfirmed"])
     st.caption("Po imporcie nieobecności użyj „Uzupełnij planowane godziny”, aby nanieść je do tabeli przed zapisem.")
 
     key = draft_item_key(year, month, "attendance")
