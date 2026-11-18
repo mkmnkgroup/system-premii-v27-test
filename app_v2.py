@@ -1398,8 +1398,11 @@ def _render_calculator_tab():
             _value_mode = ("unit" if _value_kind.startswith("Cena") else "position")
           else:
             st.caption("Dane o wartości sprzedaży zostaną pominięte do czasu potwierdzenia kolumny.")
-        prod_df = cached_read_production_v2(
-            _report_data, value_column=_value_column if _value_mode else None
+        # Omitting the optional argument keeps the same cache key used by
+        # Settings' category preview; no second large Excel parse.
+        prod_df = (
+            cached_read_production_v2(_report_data, value_column=_value_column)
+            if _value_mode else cached_read_production_v2(_report_data)
         )
         if uploaded_weights_file is None:
           st.warning("Wgraj aktualną bazę wag, aby obliczyć premię z raportu produkcji.")
