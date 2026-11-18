@@ -69,9 +69,10 @@ def workflow_steps(state, *, year, month, period_label,
                   "Zatwierdzone dodatki znajdują się w zapisanej wersji roboczej miesiąca. "
                   "Przywróć ją przed edycją.")
     elif extras_saved:
-        extras = ("Zatwierdzone lokalnie", "working",
-                  "Dodatki zatwierdzono w formularzu, ale nie potwierdzono ich trwałego "
-                  "zapisu. Użyj „Zapisz wersję roboczą miesiąca”.")
+        extras = ("Dodatki wprowadzone", "done",
+                  "Kliknięto „Zapisz i przelicz dodatki” dla tego miesiąca. "
+                  "Dane są zatwierdzone w bieżącej sesji. Aby zachować je po wylogowaniu, "
+                  "zapisz również wersję roboczą miesiąca w Supabase.")
     elif remote.get("bonuses") == "draft":
         extras = ("Szkic w bazie", "working",
                   "Dane dodatków zapisano w wersji roboczej, ale brak potwierdzenia "
