@@ -224,12 +224,14 @@ if "loaded_settings_v27" not in st.session_state:
 saved_settings = st.session_state.loaded_settings_v27
 
 from client_categories import CLIENT_CATEGORY_COLUMN, category_options, exclude_categories
-from production_import import read_production, read_weights, prepare_production
+from production_import import (
+    read_production, read_weights, prepare_production, production_value_candidates,
+)
 from weight_research import product_search_url, validate_weight
 
 @st.cache_data(show_spinner="Odczytywanie raportu produkcji...", max_entries=3)
-def cached_read_production_v2(file_bytes):
-  return read_production(file_bytes)
+def cached_read_production_v2(file_bytes, value_column=None):
+  return read_production(file_bytes, value_column=value_column)
 
 @st.cache_data(show_spinner="Odczytywanie bazy wag...", max_entries=3)
 def cached_read_weights(file_bytes):
@@ -1355,12 +1357,40 @@ def _render_calculator_tab():
     df_sched = st.session_state.current_schedule_df
     cur_pcs, cur_lines, cur_weight, cur_pallets = 0.0, 0.0, 0.0, 0.0
     prod_df = pd.DataFrame()
+    monthly_client_groups = None
     if uploaded_month_file is None:
       st.info("Aby rozpocząć rozliczenie, rozwiń panel „Dane źródłowe do rozliczenia” w tej zakładce i wgraj raport produkcji oraz katalog wag. Dodatki przygotujesz w module Dodatki premiowe.")
       return
     if uploaded_month_file is not None:
       try:
-        prod_df = cached_read_production_v2(uploaded_month_file.getvalue())
+        _report_data = uploaded_month_file.getvalue()
+        _value_options = ["— Nie wybieraj wartości —"] + production_value_candidates(_report_data)
+        _value_column_name = st.selectbox(
+            "Kolumna wartości sprzedaży netto towaru (EUR)",
+            _value_options, index=0,
+            key=f"_net_sales_eur_column_{gen_year}_{gen_month_idx}",
+            help="Wskaż dokładną kolumnę netto EUR z raportu; aplikacja nigdy nie odgaduje jej automatycznie.",
+        )
+        _value_column = (_value_column_name if _value_column_name != _value_options[0] else None)
+        _value_mode = None
+        if _value_column is not None:
+          _value_kind = st.radio(
+              "Co zawiera wybrana kolumna?",
+              ["Wartość całej pozycji netto EUR", "Cena jednostkowa netto EUR"],
+              horizontal=True,
+              key=f"_net_sales_eur_kind_{gen_year}_{gen_month_idx}",
+          )
+          _net_confirmed = st.checkbox(
+              "Potwierdzam, że wybrana kolumna dotyczy sprzedaży netto w EUR.",
+              key=f"_net_sales_eur_verified_{gen_year}_{gen_month_idx}",
+          )
+          if _net_confirmed:
+            _value_mode = ("unit" if _value_kind.startswith("Cena") else "position")
+          else:
+            st.caption("Dane o wartości sprzedaży zostaną pominięte do czasu potwierdzenia kolumny.")
+        prod_df = cached_read_production_v2(
+            _report_data, value_column=_value_column if _value_mode else None
+        )
         if uploaded_weights_file is None:
           st.warning("Wgraj aktualną bazę wag, aby obliczyć premię z raportu produkcji.")
           return
@@ -1428,6 +1458,59 @@ def _render_calculator_tab():
                              file_name="brakujace_wagi.csv", mime="text/csv")
           return
         cur_pcs, cur_lines, cur_weight = kpis["pieces"], float(kpis["positions"]), kpis["weight_kg"]
+        from client_group_analysis import group_workload
+        from client_group_analysis import estimated_main_bonus_allocation
+        try:
+          monthly_client_groups = group_workload(
+              prod_df, _catalog,
+              tuple(sorted(st.session_state.excluded_client_categories)),
+              value_mode=_value_mode,
+              workload_weights=(
+                  st.session_state.w_lines,
+                  st.session_state.w_pcs,
+                  st.session_state.w_weight,
+              ),
+          )
+        except ValueError as group_exc:
+          st.error(f"Nie można obliczyć obciążenia wg grup klientów: {group_exc}")
+          return
+        if monthly_client_groups["invalid_value_positions"]:
+          st.warning(
+              f"Wybrana kolumna EUR zawiera {monthly_client_groups['invalid_value_positions']} "
+              "nieprawidłowych wartości dla uwzględnianych pozycji. "
+              "Nie sumuję wartości EUR ani nie pokazuję udziałów wartości, "
+              "żeby nie zaniżyć wyników. Premie liczone są bez zmian."
+          )
+        with st.expander("Grupy klientów · udział w pracy magazynu", expanded=False):
+          st.caption(
+              "Wykluczone kategorie są zdublowanymi zamówieniami i nie liczą się "
+              "ani do liczników, ani do mianowników udziałów."
+          )
+          _share_cols = [
+              "group", "positions", "pieces", "weight_kg", "sales_eur_net",
+              "share_positions", "share_pieces", "share_weight_kg",
+              "share_sales_eur_net", "workload_share",
+          ]
+          st.dataframe(
+              pd.DataFrame(monthly_client_groups["groups"])[_share_cols].rename(
+                  columns={
+                      "group": "Grupa klientów", "positions": "Pozycje",
+                      "pieces": "Sztuki", "weight_kg": "Masa (kg)",
+                      "sales_eur_net": "Sprzedaż netto (EUR)",
+                      "share_positions": "Udział w pozycjach",
+                      "share_pieces": "Udział w sztukach",
+                      "share_weight_kg": "Udział w masie",
+                      "share_sales_eur_net": "Udział w wartości",
+                      "workload_share": "Udział obciążenia",
+                  }
+              ),
+              hide_index=True, use_container_width=True,
+          )
+          st.caption(
+              "Udział obciążenia to modelowa średnia ważona pozycji, sztuk i masy "
+              "według aktualnych wag wskaźników. Wartość EUR nie wpływa "
+              "na naliczenie premii głównej."
+          )
         st.success(f"Łączna waga: {cur_weight:,.2f} kg".replace(",", " "))
       except (ValueError, KeyError, OSError, ImportError) as exc:
         st.error(f"Nie można przygotować danych produkcyjnych: {exc}")
@@ -1789,6 +1872,11 @@ def _render_calculator_tab():
                   "indicator": indicator,
                   "bonus_rate": bonus_rate,
                   "variant": selected_variant,
+                  "sales_eur_net": (
+                      monthly_client_groups["totals"]["sales_eur_net"]
+                      if monthly_client_groups else None
+                  ),
+                  "client_group_workload": monthly_client_groups,
               },
           }
           if save_archive(pending_archive):
