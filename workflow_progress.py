@@ -13,25 +13,37 @@ def _saved_revision(state, year, month, stage):
 
 
 def workflow_steps(state, *, year, month, period_label,
-                   schedule_loaded, production_loaded, weights_loaded):
+                   schedule_loaded, production_loaded, weights_loaded,
+                   remote_status=None):
     """Describe monthly workflow in the actual business order; no network I/O."""
     year, month = int(year), int(month)
     month_key = f"{year:04d}-{month:02d}-01"
+    remote = remote_status or {}
     schedule_saved = _saved_revision(state, year, month, "schedule")
     attendance_saved = _saved_revision(state, year, month, "attendance")
     extras_saved = state.get("_bonus_inputs_confirmed_by_period", {}).get(period_label) is True
     extras_present = period_label in state.get("_bonus_inputs_by_period", {})
     archive = state.get("history_v2", {})
     archived = period_label in archive
-    publication_attendance = state.get("_test_attendance_publications", {}).get(month_key) is True
-    publication_bonus = state.get("_test_payroll_publications", {}).get(month_key) is True
+    remotely_archived = remote.get("archive") == "saved"
+    publication_attendance = (state.get("_test_attendance_publications", {}).get(month_key) is True
+                              or remote.get("attendance_publication") == "published")
+    publication_bonus = (state.get("_test_payroll_publications", {}).get(month_key) is True
+                         or remote.get("payroll_publication") == "published")
 
     if schedule_saved:
         plan = ("Zapisany szkic", "done",
                 "Zapis harmonogramu tego miesiąca potwierdzony w bieżącej sesji.")
+    elif remote.get("schedule") == "saved":
+        plan = ("Zapisany w bazie", "done",
+                "Szkic harmonogramu istnieje w Supabase. Przywróć go w module Harmonogram, "
+                "aby edytować zapisane dane. Nie został opublikowany pracownikom.")
     elif schedule_loaded:
         plan = ("W przygotowaniu", "working",
                 "Harmonogram utworzono lub wczytano lokalnie; zapis w bazie wymaga potwierdzenia.")
+    elif remote_status is not None and remote.get("schedule") == "unknown":
+        plan = ("Status nieznany", "working",
+                "Nie udało się potwierdzić statusu zapisu. Nie oznacza to braku harmonogramu.")
     else:
         plan = ("Do zaplanowania", "pending",
                 "Można przygotować przed rozpoczęciem miesiąca.")
@@ -39,18 +51,37 @@ def workflow_steps(state, *, year, month, period_label,
     if attendance_saved:
         attendance = ("Zapisana ewidencja", "done",
                       "Szkic wejść, wyjść, nieobecności i nadgodzin zapisano; publikacja jest osobna.")
+    elif remote.get("attendance") == "saved":
+        attendance = ("Szkic w bazie", "done",
+                      "W Supabase zapisano ewidencję. Przywróć harmonogram, a następnie ewidencję. "
+                      "Sam szkic nie potwierdza wszystkich wejść i wyjść.")
     elif schedule_loaded:
         attendance = ("Do potwierdzenia", "working",
                       "Uzupełnij faktyczne wejścia, wyjścia, nieobecności i nadgodziny.")
+    elif remote_status is not None and remote.get("attendance") == "unknown":
+        attendance = ("Status nieznany", "working",
+                      "Nie udało się sprawdzić ewidencji w bazie.")
     else:
         attendance = ("Oczekuje", "pending", "Najpierw przygotuj harmonogram.")
 
-    if extras_saved:
-        extras = ("Dodatki zapisane", "done",
-                  "Zatwierdzono dane wózka, palet i premii specjalnych dla tego miesiąca.")
+    if remote.get("bonuses") == "saved":
+        extras = ("Zapisane w bazie", "done",
+                  "Zatwierdzone dodatki znajdują się w zapisanej wersji roboczej miesiąca. "
+                  "Przywróć ją przed edycją.")
+    elif extras_saved:
+        extras = ("Zatwierdzone lokalnie", "working",
+                  "Dodatki zatwierdzono w formularzu, ale nie potwierdzono ich trwałego "
+                  "zapisu. Użyj „Zapisz wersję roboczą miesiąca”.")
+    elif remote.get("bonuses") == "draft":
+        extras = ("Szkic w bazie", "working",
+                  "Dane dodatków zapisano w wersji roboczej, ale brak potwierdzenia "
+                  "ostatecznego zatwierdzenia formularza.")
     elif extras_present:
         extras = ("Do zatwierdzenia", "working",
                   "Wartości robocze nie są potwierdzone przyciskiem zapisu dodatków.")
+    elif remote_status is not None and remote.get("bonuses") == "unknown":
+        extras = ("Status nieznany", "working",
+                  "Nie udało się sprawdzić zapisanych dodatków.")
     else:
         extras = ("Do wprowadzenia", "pending",
                   "Wprowadź godziny wózka, liczbę palet i premie specjalne.")
@@ -69,14 +100,21 @@ def workflow_steps(state, *, year, month, period_label,
                       "Po zakończeniu miesiąca wgraj raport produkcji oraz katalog wag.")
 
     payroll = (
-        ("Rozliczenie zapisane", "done", "Rozliczenie wyliczono i zapisano do archiwum sesji.")
+        ("Rozliczenie w bazie", "done",
+         "Zapisano rozliczenie w archiwum Supabase. Aby przeglądać wyniki, przywróć archiwum.")
+        if remotely_archived else
+        ("Rozliczenie w sesji", "working",
+         "Rozliczenie zapisano lokalnie. Dla trwałości zapisz archiwum w Supabase.")
         if archived else
         ("Do przeliczenia", "pending",
          "Po skompletowaniu ewidencji, dodatków oraz produkcji przelicz premie.")
     )
     stored = (
-        ("W archiwum", "done",
-         "Zapis archiwalny jest dostępny; nie oznacza publikacji na kontach pracowników.")
+        ("Zapisane w bazie", "done",
+         "Archiwum tego okresu jest zapisane w Supabase. Publikacja pozostaje osobna.")
+        if remotely_archived else
+        ("W sesji · zapisz", "working",
+         "Archiwum znajduje się w tej sesji. Zapisz je osobno w Supabase.")
         if archived else
         ("Do archiwizacji", "pending",
          "Zapisz i sprawdź rozliczenie przed udostępnieniem pracownikom.")
@@ -96,17 +134,26 @@ def workflow_steps(state, *, year, month, period_label,
     analyses = (
         ("Dostępne", "working", "Analiza zapisanego rozliczenia wybranego miesiąca.")
         if archived else
+        ("W bazie · przywróć", "working",
+         "Rozliczenie zapisano w Supabase; przywróć archiwum, by zobaczyć analizy.")
+        if remotely_archived else
         ("Po rozliczeniu", "pending", "Najpierw zapisz rozliczenie wybranego miesiąca.")
     )
+    saved_periods = remote.get("archived_periods")
+    remotely_comparable = (isinstance(saved_periods, (list, tuple))
+                           and len(saved_periods) >= 2)
     comparisons = (
         ("Dostępne", "working", "Wybierz dwa różne miesiące do porównania.")
         if len(archive) >= 2 else
+        ("W bazie · przywróć", "working",
+         "W Supabase zapisano co najmniej dwa miesiące; przywróć archiwum, aby je porównać.")
+        if remotely_comparable else
         ("Potrzebne 2 miesiące", "pending", "Zapisz rozliczenia co najmniej dwóch różnych miesięcy.")
     )
     # The same seven stages appear in the sidebar and the ribbon. Source files
     # belong to settlement; publication remains a separate action in Archive.
-    settlement = payroll if archived else production
-    if not archived and production_loaded and weights_loaded:
+    settlement = payroll if (archived or remotely_archived) else production
+    if not (archived or remotely_archived) and production_loaded and weights_loaded:
         settlement = ("Do sprawdzenia i przeliczenia", "working", production[2] + " " + payroll[2])
     archive_stage = (stored[0], stored[1], stored[2] + " Publikacja: " + published[0].lower() + ". " + published[2])
     entries = (
@@ -152,6 +199,7 @@ def progress_html(steps, period_label):
         f'<span>{escape(str(period_label), quote=True)}</span></div>'
         '<div class="erp-process-list">' + "".join(parts) + '</div>'
         '<div class="erp-process-note">Zapis szkicu, import plików i publikacja '
-        'pracownikom to trzy różne operacje. Statusy odnoszą się do bieżącej sesji.'
+        'pracownikom to trzy różne operacje. Statusy zapisów odnoszą się do Supabase lub sesji; '
+        'dane z bazy trzeba przywrócić przed edycją.'
         '</div></section>'
     )
