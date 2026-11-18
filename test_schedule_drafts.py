@@ -6,6 +6,8 @@ is published to employee-visible data; saving a draft is a separate action.
 import pandas as pd
 import requests
 import streamlit as st
+from help_ui import help_heading
+from workflow_help import SCHEDULE_DRAFT_HELP, ARCHIVE_DRAFT_HELP
 
 from db_storage import _encode, _decode
 
@@ -173,8 +175,7 @@ def render_schedule_draft(year, month, display_period):
     key = draft_item_key(year, month)
     slot = _slot(key)
     st.divider()
-    st.markdown("#### Zapis harmonogramu · Supabase TEST")
-    st.caption("Szkic jest prywatny. Zapisanie grafiku nie publikuje go pracownikom.")
+    help_heading("Zapis harmonogramu · Supabase TEST", SCHEDULE_DRAFT_HELP)
     if st.session_state.get("_schedule_local_changes_period") == display_period:
         st.info(
             "Masz nowo wygenerowany grafik w tej sesji. "
@@ -261,11 +262,7 @@ def render_archive_draft():
     key = "archive_v27"
     slot = _slot(key)
     st.divider()
-    st.markdown("#### Trwały szkic archiwum · Supabase TEST")
-    st.caption(
-        "Archiwum robocze może zawierać dane premiowe. "
-        "Jest dostępne tylko administratorowi. Zapis nie publikuje pasków premiowych."
-    )
+    help_heading("Trwały szkic archiwum · Supabase TEST", ARCHIVE_DRAFT_HELP)
     col_save, col_load = st.columns(2)
     with col_save:
         save = st.button("💾 Zapisz archiwum w Supabase", key="_save_archive_db")
