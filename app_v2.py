@@ -24,6 +24,7 @@ st.set_page_config(
 )
 
 from premium_theme import apply_theme
+from help_ui import help_icon, help_heading
 from employee_excel import read_employees_excel, write_employees_excel
 from bonus_slip_pdf import generate_bonus_slip_pdf
 
@@ -833,14 +834,13 @@ if selected_module == "Pulpit":
                        "Przywróć szkic w module Harmonogram, zanim zaczniesz ewidencję.",
     }
   with st.container(border=True):
-    st.markdown(f"#### Następny krok: {_next_step['title']}")
-    st.write(_next_step["description"])
+    help_heading(f"Następny krok: {_next_step['title']}", _next_step["description"])
     st.button(
         "Przejdź: " + _next_step["module"], type="primary",
         on_click=_open_workflow_module, args=(_next_step["module"],),
         key="dashboard_next_step",
     )
-  st.caption(
+  help_icon(
       "Przed miesiącem przygotuj harmonogram. W trakcie uzupełniaj obecności, "
       "nadgodziny oraz dodatki: wózek → palety → premie specjalne. "
       "Po miesiącu wgraj raport i wagi, przelicz premie, zapisz archiwum i przejdź do analiz."
@@ -893,8 +893,10 @@ def _confirm_schedule_replacement(year, month, expected_period):
 # ZAKŁADKA 1: HARMONOGRAM I SKANER
 # ==========================================
 if selected_module == "Harmonogram":
-  st.markdown("#### Harmonogram na wybrany miesiąc")
-  st.caption("ETAP 01 / Zaplanuj grafik z wyprzedzeniem, jeszcze przed rozpoczęciem miesiąca.")
+  help_heading(
+      "Harmonogram na wybrany miesiąc",
+      "**Etap 01.** Zaplanuj grafik z wyprzedzeniem, jeszcze przed rozpoczęciem miesiąca."
+  )
 
   if not _schedule_matches_period:
     if (_remote_workflow_status is not None
@@ -951,8 +953,10 @@ if selected_module == "Harmonogram":
   render_schedule_draft(gen_year, gen_month_idx, period_key)
 
 def _render_attendance_module():
-  st.markdown("#### Ewidencja obecności i nadgodzin")
-  st.caption("ETAP 02 / W ciągu miesiąca: wejścia, wyjścia, nieobecności i nadgodziny.")
+  help_heading(
+      "Ewidencja obecności i nadgodzin",
+      "**Etap 02.** W ciągu miesiąca uzupełnij wejścia, wyjścia, nieobecności i nadgodziny."
+  )
   if not _schedule_matches_period:
     st.warning("Najpierw przygotuj harmonogram tego miesiąca w module Harmonogram.")
     return
@@ -1143,7 +1147,7 @@ def _render_attendance_module():
       st.rerun()
 
   with st.expander("✅ 3. Uzupełnij obecności według grafiku", expanded=False):
-    st.caption(
+    help_icon(
         "Gdy sprawdziłeś nieobecności, możesz przyjąć planowane godziny "
         "dla pozostałych, jeszcze niewypełnionych dni. "
         "To decyzja administratora, a nie odczyt podpisów lub skanów."
@@ -1309,8 +1313,11 @@ if selected_module == "Obecności i nadgodziny":
   _render_attendance_module()
 
 if selected_module == "Dodatki premiowe":
-  st.markdown("#### Dodatki do premii")
-  st.caption("ETAP 03 / Wpisz czas pracy wózka, liczbę palet i premie specjalne przed rozliczeniem.")
+  help_heading(
+      "Dodatki do premii",
+      "**Etap 03.** Wpisz czas pracy wózka, liczbę palet oraz premie specjalne "
+      "przed rozliczeniem. Jeśli dany składnik nie wystąpił, pozostaw zero."
+  )
   from bonus_input_form import render_bonus_inputs
   render_bonus_inputs(
       st.session_state.employees_df,
@@ -1324,7 +1331,12 @@ if selected_module == "Dodatki premiowe":
 # ZAKŁADKA 2: KALKULATOR PREMII
 # ==========================================
 def _render_calculator_tab():
-  st.header("🧮 Przeliczenie premii i dodatków")
+  help_heading(
+      "🧮 Przeliczenie premii i dodatków",
+      "**Etap 04.** Wgraj raport produkcji i aktualny katalog wag za wybrany "
+      "miesiąc, sprawdź brakujące wagi i przelicz premie.",
+      level=2,
+  )
 
   if st.session_state.current_schedule_df.empty or st.session_state.schedule_period_key != period_key:
     st.warning("Najpierw przygotuj harmonogram dla wybranego miesiąca w pierwszej zakładce.")
@@ -1376,8 +1388,11 @@ def _render_calculator_tab():
           st.error(f"Brakuje poprawnych wag lub ilości dla {kpis['missing_positions']} pozycji. "
                    "Obliczenia premii zostały wstrzymane, aby nie zaniżyć wyniku.")
           st.dataframe(kpis["missing_items"], use_container_width=True, hide_index=True)
-          st.markdown("#### Wyszukiwanie i zatwierdzanie wag")
-          st.caption("Wyszukiwanie otwiera zewnętrzną wyszukiwarkę. Przekazywane są tylko producent i numer artykułu. Nie zatwierdzamy automatycznie wag znalezionych w sieci.")
+          help_heading(
+              "Wyszukiwanie i zatwierdzanie wag",
+              "Wyszukiwanie otwiera zewnętrzną wyszukiwarkę. Przekazywane są tylko "
+              "producent i numer artykułu. Wagi znalezione w sieci trzeba ręcznie zweryfikować."
+          )
           _missing_unique = kpis["missing_items"].drop_duplicates(["Producent", "Artykuł"])
           _options = [(str(r["Producent"]), str(r["Artykuł"])) for _, r in _missing_unique.iterrows()]
           _selected = st.selectbox("Artykuł do uzupełnienia", _options,
@@ -1440,12 +1455,11 @@ def _render_calculator_tab():
     bonus_rate = indicator * (step_bonus_pct / 0.10) if indicator > 0 else 0.0
     max_bonus_per_emp = base_salary * bonus_rate
 
-    st.info(
-        f"💡 Podstawa premii: **{base_salary:,.2f} zł netto** | Mnożnik"
-        f" Kierownika: **{st.session_state.kierownik_bonus_multiplier:.2f}x**"
-        " | Pula na wózki:"
-        f" **{st.session_state.forklift_pool:,.2f} zł netto** | Stawka za"
-        f" paletę: **{st.session_state.rate_pallet:,.2f} zł netto**"
+    help_icon(
+        f"Podstawa premii: **{base_salary:,.2f} zł netto** · Mnożnik"
+        f" kierownika: **{st.session_state.kierownik_bonus_multiplier:.2f}×** ·"
+        f" Pula na wózki: **{st.session_state.forklift_pool:,.2f} zł netto** ·"
+        f" Stawka za paletę: **{st.session_state.rate_pallet:,.2f} zł netto**"
     )
 
     st.markdown("---")
@@ -1798,9 +1812,12 @@ def _render_calculator_tab():
 
     # PASKI PREMIOWE DO WYDRUKU
     st.markdown("---")
-    st.subheader("🧾 7. Imienne Paski Premiowe do Wydruku")
-
-    st.caption("Wybierz pracownika, aby wyświetlić wyłącznie jego pasek premiowy.")
+    help_heading(
+        "🧾 7. Imienne Paski Premiowe do Wydruku",
+        "Wybierz pracownika, aby wyświetlić tylko jego pasek premiowy. "
+        "PDF tworzony jest na żądanie, a nie przy każdym przeliczeniu.",
+        level=3,
+    )
     col_print_sel, _ = st.columns([3, 1])
     with col_print_sel:
       selected_slip_emp = st.selectbox(
@@ -1827,7 +1844,7 @@ def _render_calculator_tab():
           ).encode("utf-8")
       ).hexdigest()
 
-      st.caption("PDF tworzony jest na żądanie — zmiana danych nie uruchamia wydruku.")
+      # Szczegóły generowania PDF są dostępne w pomocy sekcji powyżej.
       if st.button(
           "📄 Przygotuj PDF wybranego pracownika",
           key="prepare_bonus_slip_pdf",
@@ -1982,7 +1999,11 @@ if selected_module == "Rozliczenie premii":
 if selected_module == "Analizy":
   # Avoid importing Plotly during login or schedule editing.
   import plotly.express as px
-  st.header("📊 Dashboard Analityczny")
+  help_heading(
+      "📊 Dashboard Analityczny",
+      "**Etap 06.** Wykresy premii i nadgodzin powstają z zapisanych rozliczeń.",
+      level=2,
+  )
   if period_key in st.session_state.history_v2:
     data_hist = st.session_state.history_v2[period_key]
     sum_df = data_hist["summary"]
@@ -2017,7 +2038,12 @@ if selected_module == "Analizy":
 # ZAKŁADKA 4: ARCHIWUM
 # ==========================================
 if selected_module == "Archiwum":
-  st.header("📁 Archiwum Zapisanych Rozliczeń")
+  help_heading(
+      "📁 Archiwum Zapisanych Rozliczeń",
+      "**Etap 05.** Zachowaj rozliczenia do późniejszej kontroli i analiz. "
+      "Zapis do archiwum i publikacja pracownikom to osobne działania.",
+      level=2,
+  )
   from test_schedule_drafts import render_archive_draft
   render_archive_draft()
   if st.session_state.history_v2:
@@ -2041,7 +2067,12 @@ if selected_module == "Archiwum":
 # ZAKŁADKA 5: PORÓWNANIE
 # ==========================================
 if selected_module == "Porównania":
-  st.header("📈 Porównanie Okresów Historycznych")
+  help_heading(
+      "📈 Porównanie Okresów Historycznych",
+      "**Etap 07.** Porównaj wyniki zespołu, premie oraz wydajność "
+      "na podstawie co najmniej dwóch zapisanych miesięcy.",
+      level=2,
+  )
   if len(st.session_state.history_v2) >= 2:
     periods = list(st.session_state.history_v2.keys())
     p1, p2 = st.columns(2)
@@ -2174,7 +2205,12 @@ if selected_module == "Porównania":
 # ZAKŁADKA 6: USTAWIENIA
 # ==========================================
 if selected_module == "Ustawienia":
-  st.header("⚙️ Ustawienia Parametrów i Stałych Systemowych")
+  help_heading(
+      "⚙️ Ustawienia Parametrów i Stałych Systemowych",
+      "Ustaw tu stawki, średnie bazowe, wagi wskaźników, wykluczenia kategorii "
+      "klientów oraz listę pracowników. Zatwierdź zmiany przyciskiem zapisu.",
+      level=2,
+  )
 
   col_set1, col_set2 = st.columns(2)
 
@@ -2247,11 +2283,14 @@ if selected_module == "Ustawienia":
       )
 
   st.markdown("---")
-  st.subheader("🚫 Wykluczenia grup klientów")
-  st.caption("Źródło: Название текущей категории клиента. "
-             "Zaznaczone grupy są pomijane w obliczeniach; plik źródłowy pozostaje bez zmian.")
+  help_heading(
+      "🚫 Wykluczenia grup klientów",
+      "Źródło: Название текущей категории клиента. "
+      "Wykluczone grupy nie są liczone do premii ani analiz, ale plik źródłowy pozostaje bez zmian. "
+      "Stałe wykluczenia: test, UA-2, АНД, ОПТ_UA, ФОП_UA.",
+      level=3,
+  )
   mandatory_excluded = {"test", "UA-2", "АНД", "ОПТ_UA", "ФОП_UA"}
-  st.caption("Stałe wykluczenia: test, UA-2, АНД, ОПТ_UA, ФОП_UA.")
   saved_excluded = st.session_state.excluded_client_categories
   available_categories = sorted(set(client_categories_in_file) | set(saved_excluded))
   if not client_categories_in_file:
@@ -2264,8 +2303,10 @@ if selected_module == "Ustawienia":
       key="excluded_categories_editor",
   )
   st.session_state.excluded_client_categories = sorted(set(selected_excluded) | mandatory_excluded)
-  st.caption("Zapisz zmiany przyciskiem «Zapisz ustawienia w sesji testowej» poniżej. "
-             "Zmiany działają w bieżącej sesji od razu.")
+  help_icon(
+      "Zapisz zmiany przyciskiem „Zapisz ustawienia w sesji testowej” poniżej. "
+      "Zmiany działają w bieżącej sesji od razu."
+  )
 
   st.markdown("---")
   st.subheader("👥 Zespół i Pracownicy")
