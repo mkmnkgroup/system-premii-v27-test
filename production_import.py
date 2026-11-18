@@ -8,6 +8,42 @@ ARTICLE = "Каталожный номер отформатированный"
 QTY = "Количество штук в строке заказа"
 DATE = "Дата перехода в искомое состояние"
 
+# Selected source column is retained as an explicit value field; do not infer
+# price, currency or invoice totals from an arbitrary numeric source column.
+GOODS_VALUE = "_goods_value_source"
+VALUE_HINTS = ("стоим", "сумма", "вартіст", "вартос", "warto", "value", "amount")
+
+
+def _production_header(file_bytes):
+    from openpyxl import load_workbook
+    book = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+    try:
+        rows = book.active.iter_rows(values_only=True)
+        for index, row in enumerate(rows):
+            if index >= 12:
+                break
+            named = {str(value).strip(): i for i, value in enumerate(row)
+                     if value is not None and str(value).strip()}
+            if all(name in named for name in
+                   (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE)):
+                return named, rows, book
+        raise ValueError("Nie znaleziono wymaganych kolumn raportu produkcji.")
+    except Exception:
+        book.close()
+        raise
+
+
+def production_value_candidates(file_bytes):
+    """Only find plausible value headers; operator explicitly chooses one."""
+    named, _, book = _production_header(file_bytes)
+    try:
+        return sorted(name for name in named
+                      if name not in (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE)
+                      and any(hint in name.casefold() for hint in VALUE_HINTS))
+    finally:
+        book.close()
+
+
 
 def parse_production_dates(values):
     """Vectorized mixed-date parser with explicit ISO vs local date order.
@@ -38,26 +74,21 @@ def normalize(value):
     return str(value).strip().casefold() if pd.notna(value) else ""
 
 
-def read_production(file_bytes):
-    """Read only required fields, supporting metadata rows in supplier exports."""
-    from openpyxl import load_workbook
-    columns = (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE)
-    book = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+def read_production(file_bytes, value_column=None):
+    """Read source work fields plus the *explicitly selected* merchandise value."""
+    named, rows, book = _production_header(file_bytes)
+    columns = [CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE]
+    if value_column is not None:
+        if value_column not in named or value_column in columns:
+            book.close()
+            raise ValueError("Nie znaleziono wybranej kolumny wartości w raporcie.")
+        columns.append(value_column)
+    indices = [named[key] for key in columns]
+    output = columns[:-1] + [GOODS_VALUE] if value_column else columns
     try:
-        sheet = book.active
-        rows = sheet.iter_rows(values_only=True)
-        header = None
-        for index, row in enumerate(rows):
-            if index >= 12:
-                break
-            candidate = {str(value).strip(): pos for pos, value in enumerate(row) if value is not None}
-            if all(name in candidate for name in columns):
-                header = [candidate[name] for name in columns]
-                break
-        if header is None:
-            raise ValueError("Nie znaleziono wymaganych kolumn raportu produkcji.")
-        values = ([row[i] if i < len(row) else None for i in header] for row in rows)
-        return pd.DataFrame.from_records(values, columns=columns)
+        values = ([row[i] if i < len(row) else None for i in indices]
+                  for row in rows)
+        return pd.DataFrame.from_records(values, columns=output)
     finally:
         book.close()
 
