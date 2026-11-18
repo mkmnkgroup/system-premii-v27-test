@@ -5,6 +5,8 @@ after "Zapisz i przelicz dodatki", not after each typed cell.
 """
 import pandas as pd
 import streamlit as st
+from help_ui import help_icon
+from workflow_help import BONUS_HELP, MODULE_HELP
 
 
 def _empty_specials():
@@ -110,10 +112,7 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
             "„Wersję roboczą miesiąca” w Supabase."
         )
     else:
-        st.info(
-            "Uzupełnij wózek, palety i premie specjalne (także wartości zerowe). "
-            "Zatwierdź je przyciskiem **Zapisz i przelicz dodatki**."
-        )
+        help_icon(MODULE_HELP["bonuses"])
     safe_key = _safe_period_id(period)
 
     people_df = employees_df[["OSOBA", "UPRAWNIENIA UDT"]].copy()
@@ -123,9 +122,9 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
 
     with st.form("bonus_additions_form_" + safe_key, clear_on_submit=False):
         with st.expander("1. Wózek widłowy — godziny na pracownika", expanded=True):
-            st.caption(
-                f"Wpisz faktyczne godziny. Pula {forklift_pool:,.2f} zł "
-                "zostanie podzielona proporcjonalnie do sumy godzin zespołu."
+            help_icon(
+                BONUS_HELP["forklift"]
+                + f"\n\n**Aktualna pula do podziału:** {forklift_pool:,.2f} zł."
             )
             edited_forklift = st.data_editor(
                 editor_source,
@@ -142,6 +141,7 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
             )
 
         with st.expander("2. Palety — liczba i uczestnicy podziału", expanded=True):
+            help_icon(BONUS_HELP["pallets"])
             pallet_value = st.number_input(
                 "Łączna liczba rozładowanych i załadowanych palet",
                 value=float(saved["pallets"]),
@@ -160,9 +160,7 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
             st.caption(f"Stawka za paletę: {pallet_rate:,.2f} zł.")
 
         with st.expander("3. Premie specjalne — za co i ile", expanded=False):
-            st.caption(
-                "Dodaj wiersz dla każdej nagrody. Pracownik zobaczy kwotę i powód przyznania."
-            )
+            help_icon(BONUS_HELP["specials"])
             edited_specials = st.data_editor(
                 saved["specials"],
                 column_config={
@@ -229,8 +227,10 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
     pool = pallets * float(pallet_rate)
     per_person = pool / len(selected) if selected else 0.0
 
-    st.caption(
-        "Obowiązujące w rozliczeniu wartości (po ostatnim zapisaniu formularza):"
+    help_icon(
+        "Wartości poniżej pochodzą z **ostatniego zatwierdzenia formularza**. "
+        "Samo wpisywanie w tabeli nie zmienia rozliczenia, dopóki nie klikniesz "
+        "„Zapisz i przelicz dodatki”."
     )
     a, b, c = st.columns(3)
     a.metric("Wózek · godziny zespołu", f"{forklift_hours:,.1f} h")
