@@ -25,6 +25,7 @@ st.set_page_config(
 
 from premium_theme import apply_theme
 from help_ui import help_icon, help_heading
+from workflow_help import MODULE_HELP
 from employee_excel import read_employees_excel, write_employees_excel
 from bonus_slip_pdf import generate_bonus_slip_pdf
 
@@ -895,7 +896,7 @@ def _confirm_schedule_replacement(year, month, expected_period):
 if selected_module == "Harmonogram":
   help_heading(
       "Harmonogram na wybrany miesiąc",
-      "**Etap 01.** Zaplanuj grafik z wyprzedzeniem, jeszcze przed rozpoczęciem miesiąca."
+      MODULE_HELP["schedule"]
   )
 
   if not _schedule_matches_period:
@@ -955,7 +956,7 @@ if selected_module == "Harmonogram":
 def _render_attendance_module():
   help_heading(
       "Ewidencja obecności i nadgodzin",
-      "**Etap 02.** W ciągu miesiąca uzupełnij wejścia, wyjścia, nieobecności i nadgodziny."
+      MODULE_HELP["attendance"]
   )
   if not _schedule_matches_period:
     st.warning("Najpierw przygotuj harmonogram tego miesiąca w module Harmonogram.")
@@ -1315,8 +1316,7 @@ if selected_module == "Obecności i nadgodziny":
 if selected_module == "Dodatki premiowe":
   help_heading(
       "Dodatki do premii",
-      "**Etap 03.** Wpisz czas pracy wózka, liczbę palet oraz premie specjalne "
-      "przed rozliczeniem. Jeśli dany składnik nie wystąpił, pozostaw zero."
+      MODULE_HELP["bonuses"]
   )
   from bonus_input_form import render_bonus_inputs
   render_bonus_inputs(
@@ -1333,8 +1333,7 @@ if selected_module == "Dodatki premiowe":
 def _render_calculator_tab():
   help_heading(
       "🧮 Przeliczenie premii i dodatków",
-      "**Etap 04.** Wgraj raport produkcji i aktualny katalog wag za wybrany "
-      "miesiąc, sprawdź brakujące wagi i przelicz premie.",
+      MODULE_HELP["settlement"],
       level=2,
   )
 
@@ -2001,7 +2000,7 @@ if selected_module == "Analizy":
   import plotly.express as px
   help_heading(
       "📊 Dashboard Analityczny",
-      "**Etap 06.** Wykresy premii i nadgodzin powstają z zapisanych rozliczeń.",
+      MODULE_HELP["analytics"],
       level=2,
   )
   if period_key in st.session_state.history_v2:
@@ -2040,8 +2039,7 @@ if selected_module == "Analizy":
 if selected_module == "Archiwum":
   help_heading(
       "📁 Archiwum Zapisanych Rozliczeń",
-      "**Etap 05.** Zachowaj rozliczenia do późniejszej kontroli i analiz. "
-      "Zapis do archiwum i publikacja pracownikom to osobne działania.",
+      MODULE_HELP["archive"],
       level=2,
   )
   from test_schedule_drafts import render_archive_draft
@@ -2069,8 +2067,7 @@ if selected_module == "Archiwum":
 if selected_module == "Porównania":
   help_heading(
       "📈 Porównanie Okresów Historycznych",
-      "**Etap 07.** Porównaj wyniki zespołu, premie oraz wydajność "
-      "na podstawie co najmniej dwóch zapisanych miesięcy.",
+      MODULE_HELP["comparisons"],
       level=2,
   )
   if len(st.session_state.history_v2) >= 2:
@@ -2207,8 +2204,7 @@ if selected_module == "Porównania":
 if selected_module == "Ustawienia":
   help_heading(
       "⚙️ Ustawienia Parametrów i Stałych Systemowych",
-      "Ustaw tu stawki, średnie bazowe, wagi wskaźników, wykluczenia kategorii "
-      "klientów oraz listę pracowników. Zatwierdź zmiany przyciskiem zapisu.",
+      MODULE_HELP["settings"],
       level=2,
   )
 
