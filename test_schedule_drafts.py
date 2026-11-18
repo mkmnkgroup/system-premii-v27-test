@@ -94,19 +94,94 @@ def decode_archive_payload(payload):
     return archive
 
 
+def _save_schedule_snapshot(key, slot, year, month, display_period, expected_revision):
+    """Save current screen without publishing; server enforces revision locking."""
+    frame = st.session_state.get("current_schedule_df")
+    if (not isinstance(frame, pd.DataFrame) or frame.empty
+            or st.session_state.get("schedule_period_key") != display_period):
+        st.error("Najpierw przygotuj poprawny harmonogram wybranego miesiąca.")
+        return False
+    payload = {
+        "schedule": _encode(frame),
+        "period": safe_period(year, month),
+        "format_version": 1,
+    }
+    try:
+        # Reject saving a graph for the wrong month or incomplete schedule.
+        decode_schedule_payload(payload, year, month)
+    except (ValueError, TypeError, KeyError):
+        st.error("Nie zapisano: harmonogram jest niekompletny lub zawiera daty z innego miesiąca.")
+        return False
+    ok, result = _request("write", key, payload=payload,
+                          expected_revision=expected_revision)
+    if not ok:
+        st.error(result.get("error",
+                            "Nie zapisano harmonogramu. Sprawdź, czy w bazie nie ma nowszej wersji."))
+        return False
+    revision = result.get("revision")
+    if type(revision) is not int or revision < 1:
+        st.error("Serwer nie potwierdził numeru zapisanej wersji. Sprawdź stan bazy.")
+        return False
+    st.session_state[slot] = revision
+    if st.session_state.get("_schedule_local_changes_period") == display_period:
+        st.session_state.pop("_schedule_local_changes_period", None)
+    st.toast("Zapisano harmonogram w Supabase. Pracownicy nie otrzymali publikacji.", icon="✅")
+    return True
+
+
+@st.dialog("Zastąpić istniejący zapis harmonogramu?")
+def _confirm_schedule_draft_overwrite(key, slot, year, month, display_period, expected_revision):
+    """Require an informed decision, then re-check revision before writing."""
+    st.warning(
+        f"W Supabase jest już harmonogram za **{display_period}** "
+        f"(wersja {expected_revision}). Zapisanie bieżącego grafiku zastąpi tę wersję."
+    )
+    st.caption(
+        "Jeśli wolisz wcześniejszy grafik, wybierz Anuluj, a następnie "
+        "„Przywróć szkic z Supabase”. Stary zapis możesz wcześniej wyeksportować. "
+        "Publikacja pracownikom jest oddzielną czynnością."
+    )
+    left, right = st.columns(2)
+    with left:
+        if st.button("Anuluj", key="cancel_saved_schedule_overwrite", use_container_width=True):
+            st.rerun()
+    with right:
+        if st.button(
+            "Tak, zastąp zapis w bazie", type="primary",
+            key="confirm_saved_schedule_overwrite", use_container_width=True,
+        ):
+            ok, latest = _request("read", key)
+            if not ok:
+                st.error(latest.get("error", "Nie można sprawdzić aktualnego zapisu."))
+                return
+            if not latest.get("found") or latest.get("revision") != expected_revision:
+                st.error(
+                    "W międzyczasie zapis w bazie został zmieniony. "
+                    "Nie nadpisano go. Sprawdź najnowszą wersję."
+                )
+                return
+            if _save_schedule_snapshot(
+                key, slot, year, month, display_period, expected_revision
+            ):
+                st.rerun()
+
+
 def render_schedule_draft(year, month, display_period):
-    """Save or explicitly restore one month's schedule. Never auto-publish."""
+    """Save current month or deliberately restore a saved private schedule."""
     key = draft_item_key(year, month)
     slot = _slot(key)
     st.divider()
-    st.markdown("#### Trwały szkic harmonogramu · Supabase TEST")
-    st.caption(
-        "Zapis jest oddzielny od publikacji dla pracowników. "
-        "W bazie przechowywany jest wyłącznie szkic wybranego miesiąca."
-    )
+    st.markdown("#### Zapis harmonogramu · Supabase TEST")
+    st.caption("Szkic jest prywatny. Zapisanie grafiku nie publikuje go pracownikom.")
+    if st.session_state.get("_schedule_local_changes_period") == display_period:
+        st.info(
+            "Masz nowo wygenerowany grafik w tej sesji. "
+            "Aby go zachować, wybierz „Zapisz aktualny harmonogram”. "
+            "Przywrócenie szkicu pobierze wcześniejszy grafik i zastąpi ten na ekranie."
+        )
     col_save, col_load = st.columns(2)
     with col_save:
-        save = st.button("💾 Zapisz szkic w Supabase", key="_save_" + key)
+        save = st.button("💾 Zapisz aktualny harmonogram", key="_save_" + key)
     with col_load:
         restore = st.button("📂 Przywróć szkic z Supabase", key="_restore_" + key)
 
@@ -116,29 +191,40 @@ def render_schedule_draft(year, month, display_period):
             st.warning("Najpierw przygotuj harmonogram.")
             return
         existing_revision = st.session_state.get(slot)
-        if existing_revision is None:
+        if existing_revision is not None and (
+            type(existing_revision) is not int or existing_revision < 1
+        ):
+            st.error("Nieznana wersja szkicu. Przywróć zapis z bazy.")
+            return
+        # A newly generated graph requires explicit consent before overwriting
+        # an old server draft, even if its revision is already known locally.
+        if (existing_revision is None or
+                st.session_state.get("_schedule_local_changes_period") == display_period):
             ok, existing = _request("read", key)
             if not ok:
-                st.error(existing.get("error", "Nie można sprawdzić wcześniejszego zapisu."))
+                st.error(existing.get("error", "Nie można sprawdzić zapisu w bazie."))
                 return
             if existing.get("found"):
-                st.warning(
-                    "W bazie istnieje już szkic za ten miesiąc. "
-                    "Użyj „Przywróć szkic”, aby najpierw odczytać najnowszą wersję."
+                server_revision = existing.get("revision")
+                if type(server_revision) is not int or server_revision < 1:
+                    st.error("Nieznana wersja szkicu na serwerze. Nie zapisano zmian.")
+                    return
+                if existing_revision is not None and server_revision != existing_revision:
+                    st.error(
+                        "W bazie jest nowszy szkic niż ostatnio używany. "
+                        "Nie nadpisano go. Przywróć i porównaj wersje."
+                    )
+                    return
+                _confirm_schedule_draft_overwrite(
+                    key, slot, year, month, display_period, server_revision
                 )
                 return
-        payload = {
-            "schedule": _encode(frame),
-            "period": safe_period(year, month),
-            "format_version": 1,
-        }
-        ok, result = _request("write", key, payload=payload,
-                              expected_revision=existing_revision)
-        if ok:
-            st.session_state[slot] = result["revision"]
-            st.success("Szkic harmonogramu zapisano w testowej bazie Supabase.")
-        else:
-            st.error(result.get("error", "Nie zapisano szkicu."))
+            if existing_revision is not None:
+                st.error("W bazie nie ma już zapisanego szkicu. Odśwież dane przed zapisem.")
+                return
+        _save_schedule_snapshot(
+            key, slot, year, month, display_period, existing_revision
+        )
 
     if restore:
         ok, result = _request("read", key)
@@ -154,15 +240,16 @@ def render_schedule_draft(year, month, display_period):
             st.error("Nie można odtworzyć harmonogramu. Zapis ma błędny format lub miesiąc.")
             return
         st.session_state.current_schedule_df = frame
-        # Bump editor identity so the previous session's cell edits cannot
-        # silently override the restored database values on the next rerun.
         st.session_state["_test_schedule_editor_generation"] = (
             st.session_state.get("_test_schedule_editor_generation", 0) + 1
         )
         st.session_state.schedule_period_key = display_period
         st.session_state[slot] = result["revision"]
-        st.success("Przywrócono zapisany harmonogram. Zmiany nie zostały opublikowane pracownikom.")
+        if st.session_state.get("_schedule_local_changes_period") == display_period:
+            st.session_state.pop("_schedule_local_changes_period", None)
+        st.toast("Przywrócono harmonogram z bazy. Nie opublikowano go pracownikom.", icon="✅")
         st.rerun()
+
 
 def render_archive_draft():
     """Persist all locally archived TEST monthly payroll results as a private draft.
