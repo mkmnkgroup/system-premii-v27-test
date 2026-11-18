@@ -117,7 +117,10 @@ class PlannedAttendanceTests(TestCase):
         self.assertTrue(any(
             "Zweryfikowałem nieobecności" in c.label for c in app.checkbox
         ))
-        self.assertTrue(any(BASIS_COLUMN in d.value.columns for d in app.data_editor))
+        self.assertIn(
+            "column_order=attendance_editor_column_order(df_curr)",
+            Path(APP).read_text(encoding="utf-8"),
+        )
 
 
 if __name__ == "__main__":
