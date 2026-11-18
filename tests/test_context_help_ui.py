@@ -40,7 +40,31 @@ class ContextHelpTests(TestCase):
         self.assertIn('help_heading(\n      "Dodatki do premii"', source)
         self.assertIn('MODULE_HELP["bonuses"]', source)
         helper = (ROOT / "help_ui.py").read_text(encoding="utf-8")
-        self.assertIn("st.popover(label", helper)
+        self.assertIn("@st.dialog(title, width=\"medium\")", helper)
+        self.assertIn('st.button(\n            "i"', helper)
+        self.assertIn("border-radius: 50%", helper)
+        self.assertNotIn("st.popover(", helper)
+        self.assertIn("st.markdown(HELP_STYLE, unsafe_allow_html=True)", source)
+
+    def test_help_is_hidden_until_info_button_opens_dialog(self):
+        script = '''
+import streamlit as st
+from help_ui import help_icon
+st.title("Przykładowy moduł")
+help_icon("**Instrukcja ukryta przed kliknięciem.**", title="Pomoc do modułu")
+'''
+        app = AppTest.from_string(script, default_timeout=30).run()
+        self.assertEqual(list(app.exception), [])
+        self.assertFalse(any(
+            "Instrukcja ukryta" in item.value for item in app.markdown
+        ))
+        info = next(b for b in app.button if b.label == "i")
+        info.click().run()
+        self.assertEqual(list(app.exception), [])
+        self.assertTrue(any(
+            "Instrukcja ukryta" in item.value for item in app.markdown
+        ))
+        self.assertTrue(any(b.label == "Zamknij" for b in app.button))
 
     def test_main_modules_render_without_help_icon_errors(self):
         with patch("app_auth.login_gate", return_value=None):
