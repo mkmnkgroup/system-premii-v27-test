@@ -66,6 +66,15 @@ class ReloginWorkflowTests(TestCase):
         self.assertNotEqual(r[2]["tone"], "done")
         self.assertNotEqual(r[4]["tone"], "done")
 
+    def test_archive_network_failure_is_not_interpreted_as_missing_work(self):
+        remote = {**REMOTE, "archive": "unknown", "archived_periods": None}
+        result = steps(remote)
+        self.assertEqual(result[3]["status"], "Status nieznany")
+        self.assertEqual(result[4]["status"], "Status nieznany")
+        self.assertEqual(result[5]["status"], "Status nieznany")
+        self.assertEqual(result[6]["status"], "Status nieznany")
+        self.assertTrue(all(result[i]["tone"] != "done" for i in (3, 4, 5, 6)))
+
     def test_legacy_bonus_draft_remains_valid_but_unconfirmed(self):
         period = PERIOD
         data = {
