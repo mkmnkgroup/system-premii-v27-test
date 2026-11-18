@@ -1082,6 +1082,11 @@ def _render_attendance_module():
         st.rerun()
 
   st.markdown("---")
+  from planned_attendance import (
+      BASIS_COLUMN, PLANNED_BASIS, fill_according_to_plan,
+      reconcile_attendance_basis, reconcile_verified_absences,
+      attendance_editor_column_order,
+  )
   col_b1, _, _ = st.columns([1.5, 1.5, 2])
   with col_b1:
     if st.button("⏱️ Uzupełnij planowane godziny", use_container_width=True):
@@ -1111,6 +1116,9 @@ def _render_attendance_module():
           return row.get("NIEOBECNOŚĆ", "Brak")
 
         df_temp["NIEOBECNOŚĆ"] = df_temp.apply(apply_absences, axis=1)
+        df_temp = reconcile_verified_absences(
+            st.session_state.current_schedule_df, df_temp
+        )
 
       def fill_hours(row):
         absence = str(row.get("NIEOBECNOŚĆ", "Brak")).strip()
@@ -1134,28 +1142,95 @@ def _render_attendance_module():
       st.success("Naniesiono planowane godziny!")
       st.rerun()
 
+  with st.expander("✅ 3. Uzupełnij obecności według grafiku", expanded=False):
+    st.caption(
+        "Gdy sprawdziłeś nieobecności, możesz przyjąć planowane godziny "
+        "dla pozostałych, jeszcze niewypełnionych dni. "
+        "To decyzja administratora, a nie odczyt podpisów lub skanów."
+    )
+    _first_day = datetime(gen_year, gen_month_idx, 1).date()
+    _last_day = datetime(
+        gen_year, gen_month_idx,
+        calendar.monthrange(gen_year, gen_month_idx)[1],
+    ).date()
+    _today = datetime.now().date()
+    if _today < _first_day:
+      st.info("Nie można potwierdzać obecności przed rozpoczęciem miesiąca.")
+    else:
+      _max_day = min(_last_day, _today)
+      _through = st.date_input(
+          "Uzupełnij dni do (włącznie)",
+          value=_max_day, min_value=_first_day, max_value=_max_day,
+          key=f"fill_attendance_through_{gen_year}_{gen_month_idx}",
+      )
+      try:
+        _proposal, _counts = fill_according_to_plan(
+            st.session_state.current_schedule_df, through=_through,
+        )
+        st.caption(
+            f"Do uzupełnienia: {_counts['filled']} wpisów · "
+            f"Nieobecności pominięte: {_counts['absences']} · "
+            f"Godziny już wpisane: {_counts['existing']} · "
+            f"Niepełne wpisy do sprawdzenia: {_counts['partial']}."
+        )
+        if _counts["invalid_shift"] or _counts["invalid_date"]:
+          st.warning(
+              f"Pominięto {_counts['invalid_shift']} zmian z niepoprawną godziną "
+              f"i {_counts['invalid_date']} wierszy z błędną datą."
+          )
+        _accept = st.checkbox(
+            "Zweryfikowałem nieobecności. Przyjmuję planowane godziny jako "
+            "obecność dla pozostałych niewypełnionych dni.",
+            key=f"accept_planned_attendance_{gen_year}_{gen_month_idx}",
+        )
+        if st.button(
+            "Uzupełnij obecności według harmonogramu",
+            disabled=not _accept or _counts["filled"] == 0,
+            key=f"apply_planned_attendance_{gen_year}_{gen_month_idx}",
+        ):
+          st.session_state.current_schedule_df = _proposal
+          st.session_state["_test_schedule_editor_generation"] = (
+              st.session_state.get("_test_schedule_editor_generation", 0) + 1
+          )
+          st.toast(
+              f"Uzupełniono {_counts['filled']} dni wg grafiku. "
+              "Nadgodziny pozostają do ręcznego uzupełnienia. Zapisz ewidencję osobno.",
+              icon="✅",
+          )
+          st.rerun()
+      except ValueError as exc:
+        st.error(str(exc))
+
   df_curr = st.session_state.current_schedule_df.copy()
+  if BASIS_COLUMN not in df_curr.columns:
+    df_curr[BASIS_COLUMN] = ""
   if "FAKTYCZNIE WEJŚCIE" not in df_curr.columns:
     df_curr["FAKTYCZNIE WEJŚCIE"] = ""
   if "FAKTYCZNIE WYJŚCIE" not in df_curr.columns:
     df_curr["FAKTYCZNIE WYJŚCIE"] = ""
 
   st.markdown("---")
-  st.subheader("⚠️ Weryfikacja Obecności i Brakujących Podpisów")
+  st.subheader("⚠️ Weryfikacja obecności i brakujących godzin")
 
+  from attendance_validation import has_absence
+  _is_working = df_curr["DZIEŃ PRACUJĄCY/WOLNY"].eq("Pracujący")
+  _has_absence = df_curr["NIEOBECNOŚĆ"].apply(has_absence)
+  _in_time = df_curr["FAKTYCZNIE WEJŚCIE"].fillna("").astype(str).str.strip()
+  _out_time = df_curr["FAKTYCZNIE WYJŚCIE"].fillna("").astype(str).str.strip()
   missing_signatures = df_curr[
-      (df_curr["DZIEŃ PRACUJĄCY/WOLNY"] == "Pracujący")
-      & (df_curr["NIEOBECNOŚĆ"].isin(["Brak", "", "None"]))
-      & (
-          (df_curr["FAKTYCZNIE WEJŚCIE"] == "")
-          | (df_curr["FAKTYCZNIE WEJŚCIE"].isna())
-      )
+      _is_working & ~_has_absence & ((_in_time == "") | (_out_time == ""))
   ]
+  _assumed = int((_is_working & df_curr[BASIS_COLUMN].eq(PLANNED_BASIS)).sum())
+  if _assumed:
+    st.info(
+        f"{_assumed} dni przyjęto według harmonogramu na podstawie Twojej "
+        "weryfikacji nieobecności. Nie oznacza to podpisów pracowników."
+    )
 
   if not missing_signatures.empty:
     st.markdown(
         f'<div class="alert-box"><strong>Wykryto'
-        f' {len(missing_signatures)} brakujących podpisów na listach!</strong></div>',
+        f' {len(missing_signatures)} wpisów z brakującymi godzinami!</strong></div>',
         unsafe_allow_html=True,
     )
     st.dataframe(
@@ -1171,8 +1246,8 @@ def _render_attendance_module():
     )
   else:
     st.markdown(
-        '<div class="success-box"><strong>Wszystko w porządku!</strong>'
-        " Wszystkie dni robocze mają pokrycie w podpisach.</div>",
+        '<div class="success-box"><strong>Brak pustych godzin.</strong>'
+        " Wszystkie zaplanowane dni mają godziny albo nieobecność. Nie oznacza to podpisów.</div>",
         unsafe_allow_html=True,
     )
 
@@ -1190,7 +1265,12 @@ def _render_attendance_module():
 
   edited_df = st.data_editor(
       df_curr,
+      column_order=attendance_editor_column_order(df_curr),
       column_config={
+          BASIS_COLUMN: st.column_config.TextColumn(
+              "Podstawa ewidencji", disabled=True,
+              help="Odróżnia godziny przyjęte według grafiku od innych wpisów.",
+          ),
           "NIEOBECNOŚĆ": st.column_config.SelectboxColumn(
               "NIEOBECNOŚĆ",
               options=dynamic_absence_options,
@@ -1214,7 +1294,7 @@ def _render_attendance_module():
   )
 
   if isinstance(edited_df, pd.DataFrame):
-    st.session_state.current_schedule_df = edited_df
+    st.session_state.current_schedule_df = reconcile_attendance_basis(edited_df)
 
 
   # Publikowanie obecności to osobna, świadomie zatwierdzana operacja.
