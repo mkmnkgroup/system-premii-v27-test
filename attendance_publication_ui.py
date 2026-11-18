@@ -84,6 +84,12 @@ def render_attendance_publication(year, month):
                 "Przypisz pracowników do aktywnych kont w panelu Administracja · "
                 "Użytkownicy. Identyfikator musi odpowiadać kolumnie OSOBA."
             )
+            if st.button(
+                "Otwórz Administracja · Użytkownicy",
+                key="_attendance_open_admin_links_" + period,
+            ):
+                st.session_state["_test_admin_panel"] = True
+                st.rerun()
             return
 
         st.markdown(f"**Zapisana wersja: {revision} · Wpisy: {len(table)} · Konta: {n_users}**")
