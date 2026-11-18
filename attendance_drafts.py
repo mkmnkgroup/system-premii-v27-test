@@ -245,6 +245,8 @@ def render_attendance_draft(year, month, display_period):
         ok, result = _request("write", key, payload=payload, expected_revision=revision)
         if ok:
             st.session_state[slot] = result["revision"]
+            from workflow_status_sync import invalidate_remote_workflow_status
+            invalidate_remote_workflow_status(st.session_state, year, month)
             st.success("Ewidencja obecności została trwale zapisana (szkic).")
         else:
             st.error(result.get("error", "Nie zapisano ewidencji."))
