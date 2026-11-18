@@ -834,6 +834,49 @@ if selected_module == "Pulpit":
       "Po miesiącu wgraj raport i wagi, przelicz premie, zapisz archiwum i przejdź do analiz."
   )
 
+def _apply_generated_schedule(year, month, expected_period):
+  """Change only the local schedule, never auto-save or publish anything."""
+  st.session_state.current_schedule_df = generate_schedule(year, month)
+  st.session_state.schedule_period_key = expected_period
+  st.session_state["_test_schedule_editor_generation"] = (
+      st.session_state.get("_test_schedule_editor_generation", 0) + 1
+  )
+  # The saved server revision is kept so the new version can be deliberately
+  # saved over the previous draft. It is NOT persisted by this action.
+  st.session_state["_schedule_local_changes_period"] = expected_period
+  st.toast("Wygenerowano nowy harmonogram. Zapisz go osobno, aby zachować zmiany.", icon="✅")
+
+
+@st.dialog("Zastąpić obecny harmonogram?")
+def _confirm_schedule_replacement(year, month, expected_period):
+  st.warning(
+      f"Masz już harmonogram na **{expected_period}**. "
+      "Wygenerowanie nowego zastąpi aktualny grafik, w tym ręcznie "
+      "wprowadzone zmiany, obecności i nadgodziny w bieżącej sesji."
+  )
+  st.caption(
+      "To nie usuwa szkicu zapisanego w Supabase ani nie publikuje danych. "
+      "Nowy harmonogram trzeba zapisać osobno."
+  )
+  cancel_col, confirm_col = st.columns(2)
+  with cancel_col:
+    if st.button("Anuluj", use_container_width=True, key="cancel_schedule_replace_dialog"):
+      st.rerun()
+  with confirm_col:
+    if st.button(
+        "Tak, zastąp harmonogram", type="primary", use_container_width=True,
+        key="confirm_schedule_replace_dialog",
+    ):
+      if (
+          st.session_state.get("schedule_period_key") != expected_period
+          or st.session_state.current_schedule_df.empty
+      ):
+        st.error("Wybrany miesiąc lub harmonogram zmienił się. Otwórz ponownie okno.")
+        return
+      _apply_generated_schedule(year, month, expected_period)
+      st.rerun()
+
+
 # ==========================================
 # ZAKŁADKA 1: HARMONOGRAM I SKANER
 # ==========================================
@@ -845,17 +888,12 @@ if selected_module == "Harmonogram":
     st.info("Dla wybranego miesiąca nie ma jeszcze aktywnego harmonogramu. Możesz wygenerować nowy lub wgrać wcześniej zapisany.")
   col_action1, col_action2, _ = st.columns([1.5, 1.5, 2])
   with col_action1:
-    _confirm_replace = st.checkbox(
-        "Potwierdzam zastąpienie obecnego harmonogramu",
-        key="confirm_schedule_replace",
-    ) if _schedule_matches_period else True
-    if st.button("📅 Wygeneruj harmonogram", disabled=not _confirm_replace):
-      st.session_state.current_schedule_df = generate_schedule(
-          gen_year, gen_month_idx
-      )
-      st.session_state.schedule_period_key = period_key
-      st.success("Wygenerowano harmonogram!")
-      st.rerun()
+    if st.button("📅 Wygeneruj nowy harmonogram", key="generate_new_schedule"):
+      if _schedule_matches_period:
+        _confirm_schedule_replacement(gen_year, gen_month_idx, period_key)
+      else:
+        _apply_generated_schedule(gen_year, gen_month_idx, period_key)
+        st.rerun()
 
   with col_action2:
     uploaded_schedule_excel = st.file_uploader(
