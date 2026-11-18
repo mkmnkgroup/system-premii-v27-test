@@ -49,7 +49,11 @@ class ScheduleReplacementDialogTests(unittest.TestCase):
         )
         self.assertTrue(any(b.label == "Anuluj" for b in app.button))
         self.assertTrue(any(b.label == "Tak, zastąp harmonogram" for b in app.button))
-        next(b for b in app.button if b.label == "Anuluj").click().run()
+        # AppTest always reruns the whole script, not the dialog fragment.
+        # Re-open it in the same synthetic run as the dialog button click.
+        # In a real browser the dialog reruns independently.
+        next(b for b in app.button if b.label == "Anuluj").click()
+        next(b for b in app.button if b.label == "📅 Wygeneruj nowy harmonogram").click().run()
         self.assertEqual(list(app.exception), [])
         self.assertEqual(
             app.session_state.current_schedule_df.loc[0, "OSOBA"],
@@ -63,7 +67,10 @@ class ScheduleReplacementDialogTests(unittest.TestCase):
         app.session_state["_test_schedule_editor_generation"] = 10
         next(b for b in app.button if b.label == "📅 Wygeneruj nowy harmonogram").click().run()
         self.assertEqual(list(app.exception), [])
-        next(b for b in app.button if b.label == "Tak, zastąp harmonogram").click().run()
+        # AppTest needs the outer dialog opener clicked in the same test run
+        # to process an inner dialog button (Streamlit testing limitation).
+        next(b for b in app.button if b.label == "Tak, zastąp harmonogram").click()
+        next(b for b in app.button if b.label == "📅 Wygeneruj nowy harmonogram").click().run()
         self.assertEqual(list(app.exception), [])
         self.assertNotEqual(
             app.session_state.current_schedule_df.loc[0, "OSOBA"],
