@@ -823,6 +823,15 @@ def _open_workflow_module(module):
 if selected_module == "Pulpit":
   st.markdown('<div class="erp-dashboard-heading">CENTRUM PRACY</div>', unsafe_allow_html=True)
   _next_step = next((step for step in _process_steps[:5] if step["tone"] != "done"), _process_steps[5])
+  if (_remote_workflow_status is not None
+      and _remote_workflow_status.get("schedule") == "saved"
+      and not _schedule_matches_period):
+    _next_step = {
+        "title": "Przywróć harmonogram",
+        "module": "Harmonogram",
+        "description": "Harmonogram tego miesiąca zapisano w Supabase. "
+                       "Przywróć szkic w module Harmonogram, zanim zaczniesz ewidencję.",
+    }
   with st.container(border=True):
     st.markdown(f"#### Następny krok: {_next_step['title']}")
     st.write(_next_step["description"])
@@ -888,7 +897,11 @@ if selected_module == "Harmonogram":
   st.caption("ETAP 01 / Zaplanuj grafik z wyprzedzeniem, jeszcze przed rozpoczęciem miesiąca.")
 
   if not _schedule_matches_period:
-    st.info("Dla wybranego miesiąca nie ma jeszcze aktywnego harmonogramu. Możesz wygenerować nowy lub wgrać wcześniej zapisany.")
+    if (_remote_workflow_status is not None
+        and _remote_workflow_status.get("schedule") == "saved"):
+      st.info("Harmonogram jest zapisany w Supabase. Użyj poniżej „Przywróć szkic z Supabase”, aby wznowić pracę.")
+    else:
+      st.info("Dla wybranego miesiąca nie ma jeszcze aktywnego harmonogramu. Możesz wygenerować nowy lub wgrać wcześniej zapisany.")
   col_action1, col_action2, _ = st.columns([1.5, 1.5, 2])
   with col_action1:
     if st.button("📅 Wygeneruj nowy harmonogram", key="generate_new_schedule"):
