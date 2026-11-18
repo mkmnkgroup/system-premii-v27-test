@@ -768,6 +768,10 @@ st.sidebar.markdown("**◈ System Premii 2.7**")
 st.sidebar.caption("TEST · tylko dane fikcyjne")
 st.sidebar.caption("ETAPY PRACY")
 from workflow_progress import workflow_steps, progress_html
+from workflow_status_sync import load_remote_workflow_status
+# Refresh read-only, user-scoped statuses after login/month change. No data
+# restoration or publication is performed by status lookup.
+_remote_workflow_status = load_remote_workflow_status(gen_year, gen_month_idx, period_key)
 def _month_workflow_steps():
   return workflow_steps(
       st.session_state,
@@ -775,6 +779,7 @@ def _month_workflow_steps():
       schedule_loaded=_schedule_matches_period,
       production_loaded=uploaded_month_file is not None,
       weights_loaded=uploaded_weights_file is not None,
+      remote_status=_remote_workflow_status,
   )
 _process_steps = _month_workflow_steps()
 _sidebar_nav_labels = {"Pulpit": "Pulpit", "Ustawienia": "Ustawienia"}
