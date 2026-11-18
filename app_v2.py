@@ -805,9 +805,9 @@ if selected_module == "Rozliczenie premii":
   _process_steps = _month_workflow_steps()
 _progress_placeholder.markdown(progress_html(_process_steps, period_key), unsafe_allow_html=True)
 
-# Test-only, owner-scoped monthly drafts. No source files or published awards.
+# Test-only, owner-scoped monthly drafts. Manual controls stay on Pulpit;
+# the opt-in autosave itself continues after every module's edits.
 from test_draft_ui import render_draft_controls, autosave_draft
-render_draft_controls(gen_year, gen_month_idx, period_key)
 
 
 # Read category choices only if the user actually edits exclusion settings.
@@ -847,6 +847,7 @@ if selected_module == "Pulpit":
       "nadgodziny oraz dodatki: wózek → palety → premie specjalne. "
       "Po miesiącu wgraj raport i wagi, przelicz premie, zapisz archiwum i przejdź do analiz."
   )
+  render_draft_controls(gen_year, gen_month_idx, period_key)
 
 def _apply_generated_schedule(year, month, expected_period):
   """Change only the local schedule, never auto-save or publish anything."""
