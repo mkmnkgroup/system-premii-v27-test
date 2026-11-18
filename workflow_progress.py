@@ -106,6 +106,9 @@ def workflow_steps(state, *, year, month, period_label,
         ("Rozliczenie w sesji", "working",
          "Rozliczenie zapisano lokalnie. Dla trwałości zapisz archiwum w Supabase.")
         if archived else
+        ("Status nieznany", "working",
+         "Nie udało się sprawdzić rozliczenia w bazie. Nie oznacza to braku zapisu.")
+        if remote_status is not None and remote.get("archive") == "unknown" else
         ("Do przeliczenia", "pending",
          "Po skompletowaniu ewidencji, dodatków oraz produkcji przelicz premie.")
     )
@@ -116,6 +119,9 @@ def workflow_steps(state, *, year, month, period_label,
         ("W sesji · zapisz", "working",
          "Archiwum znajduje się w tej sesji. Zapisz je osobno w Supabase.")
         if archived else
+        ("Status nieznany", "working",
+         "Nie udało się sprawdzić zapisów archiwum w Supabase.")
+        if remote_status is not None and remote.get("archive") == "unknown" else
         ("Do archiwizacji", "pending",
          "Zapisz i sprawdź rozliczenie przed udostępnieniem pracownikom.")
     )
@@ -137,6 +143,9 @@ def workflow_steps(state, *, year, month, period_label,
         ("W bazie · przywróć", "working",
          "Rozliczenie zapisano w Supabase; przywróć archiwum, by zobaczyć analizy.")
         if remotely_archived else
+        ("Status nieznany", "working",
+         "Nie udało się sprawdzić archiwum na serwerze.")
+        if remote_status is not None and remote.get("archive") == "unknown" else
         ("Po rozliczeniu", "pending", "Najpierw zapisz rozliczenie wybranego miesiąca.")
     )
     saved_periods = remote.get("archived_periods")
@@ -148,6 +157,8 @@ def workflow_steps(state, *, year, month, period_label,
         ("W bazie · przywróć", "working",
          "W Supabase zapisano co najmniej dwa miesiące; przywróć archiwum, aby je porównać.")
         if remotely_comparable else
+        ("Status nieznany", "working", "Nie udało się sprawdzić listy zapisanych okresów.")
+        if remote_status is not None and saved_periods is None else
         ("Potrzebne 2 miesiące", "pending", "Zapisz rozliczenia co najmniej dwóch różnych miesięcy.")
     )
     # The same seven stages appear in the sidebar and the ribbon. Source files
