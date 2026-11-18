@@ -1466,17 +1466,17 @@ def _render_calculator_tab():
                              file_name="brakujace_wagi.csv", mime="text/csv")
           return
         cur_pcs, cur_lines, cur_weight = kpis["pieces"], float(kpis["positions"]), kpis["weight_kg"]
-        from client_group_analysis import group_workload
-        monthly_client_groups = cached_client_group_workload(
-            prod_df, _catalog,
-            tuple(sorted(st.session_state.excluded_client_categories)),
-            _value_mode,
-            (
-                st.session_state.w_lines,
-                st.session_state.w_pcs,
-                st.session_state.w_weight,
-            ),
-        )
+        try:
+          monthly_client_groups = cached_client_group_workload(
+              prod_df, _catalog,
+              tuple(sorted(st.session_state.excluded_client_categories)),
+              _value_mode,
+              (
+                  st.session_state.w_lines,
+                  st.session_state.w_pcs,
+                  st.session_state.w_weight,
+              ),
+          )
         except ValueError as group_exc:
           st.error(f"Nie można obliczyć obciążenia wg grup klientów: {group_exc}")
           return
