@@ -163,7 +163,7 @@ def workflow_steps(state, *, year, month, period_label,
     )
     # The same seven stages appear in the sidebar and the ribbon. Source files
     # belong to settlement; publication remains a separate action in Archive.
-    settlement = payroll if (archived or remotely_archived) else production
+    settlement = payroll if (archived or remotely_archived or remote.get("archive") == "unknown") else production
     if not (archived or remotely_archived) and production_loaded and weights_loaded:
         settlement = ("Do sprawdzenia i przeliczenia", "working", production[2] + " " + payroll[2])
     archive_stage = (stored[0], stored[1], stored[2] + " Publikacja: " + published[0].lower() + ". " + published[2])
