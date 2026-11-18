@@ -34,12 +34,19 @@ def _production_header(file_bytes):
 
 
 def production_value_candidates(file_bytes):
-    """Only find plausible value headers; operator explicitly chooses one."""
+    """List *all* optional headers, with likely value fields first.
+
+    The operator must identify net EUR sales explicitly. A missing hint is
+    never grounds for silently substituting a different source field.
+    """
     named, _, book = _production_header(file_bytes)
     try:
-        return sorted(name for name in named
-                      if name not in (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE)
-                      and any(hint in name.casefold() for hint in VALUE_HINTS))
+        options = [name for name in named if name not in
+                   (CLIENT_CATEGORY_COLUMN, BRAND, ARTICLE, QTY, DATE)]
+        return sorted(options, key=lambda name: (
+            not any(hint in name.casefold() for hint in VALUE_HINTS),
+            name.casefold(),
+        ))
     finally:
         book.close()
 
