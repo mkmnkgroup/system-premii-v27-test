@@ -237,6 +237,14 @@ def cached_read_production_v2(file_bytes, value_column=None):
 def cached_read_weights(file_bytes):
   return read_weights(file_bytes)
 
+@st.cache_data(show_spinner=False, max_entries=5)
+def cached_client_group_workload(production, catalog, exclusions, mode, weights):
+  from client_group_analysis import group_workload
+  return group_workload(
+      production, catalog, exclusions,
+      value_mode=mode, workload_weights=weights,
+  )
+
 if "excluded_client_categories" not in st.session_state:
   st.session_state.excluded_client_categories = list(
       sorted(set(saved_settings.get("excluded_client_categories", [])) | {"test", "UA-2", "АНД", "ОПТ_UA", "ФОП_UA"}))
@@ -1459,18 +1467,16 @@ def _render_calculator_tab():
           return
         cur_pcs, cur_lines, cur_weight = kpis["pieces"], float(kpis["positions"]), kpis["weight_kg"]
         from client_group_analysis import group_workload
-        from client_group_analysis import estimated_main_bonus_allocation
-        try:
-          monthly_client_groups = group_workload(
-              prod_df, _catalog,
-              tuple(sorted(st.session_state.excluded_client_categories)),
-              value_mode=_value_mode,
-              workload_weights=(
-                  st.session_state.w_lines,
-                  st.session_state.w_pcs,
-                  st.session_state.w_weight,
-              ),
-          )
+        monthly_client_groups = cached_client_group_workload(
+            prod_df, _catalog,
+            tuple(sorted(st.session_state.excluded_client_categories)),
+            _value_mode,
+            (
+                st.session_state.w_lines,
+                st.session_state.w_pcs,
+                st.session_state.w_weight,
+            ),
+        )
         except ValueError as group_exc:
           st.error(f"Nie można obliczyć obciążenia wg grup klientów: {group_exc}")
           return
@@ -2096,6 +2102,10 @@ if selected_module == "Analizy":
       MODULE_HELP["analytics"],
       level=2,
   )
+  from warehouse_analytics_ui import render_warehouse_history
+  render_warehouse_history(st.session_state.history_v2, prefix="analytics")
+  st.divider()
+  st.subheader("Bieżący miesiąc · premie pracowników")
   if period_key in st.session_state.history_v2:
     data_hist = st.session_state.history_v2[period_key]
     sum_df = data_hist["summary"]
@@ -2163,6 +2173,10 @@ if selected_module == "Porównania":
       MODULE_HELP["comparisons"],
       level=2,
   )
+  from warehouse_analytics_ui import render_warehouse_history
+  render_warehouse_history(st.session_state.history_v2, prefix="comparisons")
+  st.divider()
+  st.subheader("Klasyczne porównanie dwóch miesięcy")
   if len(st.session_state.history_v2) >= 2:
     periods = list(st.session_state.history_v2.keys())
     p1, p2 = st.columns(2)
