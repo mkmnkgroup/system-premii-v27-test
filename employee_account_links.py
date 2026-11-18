@@ -113,3 +113,23 @@ def validate_quick_link(name, user_id, names, users):
     if len(matches) != 1:
         raise ValueError("Wybrane konto nie jest już wolne i aktywne.")
     return matches[0]
+
+def names_from_attendance_draft(payload, year, month):
+    """Get worker identities from the exact saved month to be published."""
+    period = f"{int(year):04d}-{int(month):02d}"
+    if (not isinstance(payload, dict) or payload.get("format_version") != 1
+            or payload.get("period") != period
+            or not isinstance(payload.get("entries"), list)
+            or not payload["entries"] or len(payload["entries"]) > 1500):
+        raise ValueError("Zapisana ewidencja ma nieprawidłowy format.")
+    names = []
+    for item in payload["entries"]:
+        if (not isinstance(item, dict)
+                or not isinstance(item.get("employee"), str)
+                or not item["employee"].strip()
+                or not isinstance(item.get("work_day"), str)
+                or len(item["work_day"]) != 10
+                or item["work_day"][:7] != period):
+            raise ValueError("Nieprawidłowe osoby lub daty w zapisanej ewidencji.")
+        names.append(item["employee"])
+    return normalized_employees(names)
