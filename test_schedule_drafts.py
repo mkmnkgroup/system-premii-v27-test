@@ -123,6 +123,8 @@ def _save_schedule_snapshot(key, slot, year, month, display_period, expected_rev
         st.error("Serwer nie potwierdził numeru zapisanej wersji. Sprawdź stan bazy.")
         return False
     st.session_state[slot] = revision
+    from workflow_status_sync import invalidate_remote_workflow_status
+    invalidate_remote_workflow_status(st.session_state, year, month)
     if st.session_state.get("_schedule_local_changes_period") == display_period:
         st.session_state.pop("_schedule_local_changes_period", None)
     st.toast("Zapisano harmonogram w Supabase. Pracownicy nie otrzymali publikacji.", icon="✅")
@@ -290,6 +292,8 @@ def render_archive_draft():
                               expected_revision=revision)
         if ok:
             st.session_state[slot] = result["revision"]
+            from workflow_status_sync import invalidate_remote_workflow_status
+            invalidate_remote_workflow_status(st.session_state)
             st.success("Archiwum robocze zapisano. Paski pracowników nie zostały opublikowane.")
         else:
             st.error(result.get("error", "Nie udało się zapisać archiwum."))
