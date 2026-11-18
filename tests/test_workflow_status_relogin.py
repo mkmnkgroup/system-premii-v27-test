@@ -53,6 +53,31 @@ class ReloginWorkflowTests(TestCase):
         self.assertIn("Zapisany w bazie", html)
         self.assertNotIn("Do zaplanowania", html)
 
+    def test_bonus_stage_is_done_after_form_save_even_before_cloud_snapshot(self):
+        from workflow_progress import workflow_steps
+        state = {
+            "_bonus_inputs_by_period": {PERIOD: {"pallets": 14}},
+            "_bonus_inputs_confirmed_by_period": {PERIOD: True},
+        }
+        result = workflow_steps(
+            state, year=2026, month=11, period_label=PERIOD,
+            schedule_loaded=False, production_loaded=False,
+            weights_loaded=False, remote_status={},
+        )
+        self.assertEqual(result[2]["tone"], "done")
+        self.assertEqual(result[2]["status"], "Dodatki wprowadzone")
+        self.assertIn("Supabase", result[2]["description"])
+
+        not_confirmed = {
+            "_bonus_inputs_by_period": {PERIOD: {"pallets": 14}},
+        }
+        second = workflow_steps(
+            not_confirmed, year=2026, month=11, period_label=PERIOD,
+            schedule_loaded=False, production_loaded=False,
+            weights_loaded=False, remote_status={},
+        )
+        self.assertNotEqual(second[2]["tone"], "done")
+
     def test_draft_and_unknown_are_not_false_completed_stages(self):
         remote = {**REMOTE, "schedule": "unknown", "attendance": "unknown",
                   "bonuses": "draft", "archive": "missing",
