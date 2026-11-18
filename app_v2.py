@@ -231,7 +231,9 @@ from weight_research import product_search_url, validate_weight
 
 @st.cache_data(show_spinner="Odczytywanie raportu produkcji...", max_entries=3)
 def cached_read_production_v2(file_bytes, value_column=None):
-  return read_production(file_bytes, value_column=value_column)
+  # Preserve legacy import behaviour if optional sales value is not selected.
+  return (read_production(file_bytes) if value_column is None
+          else read_production(file_bytes, value_column=value_column))
 
 @st.cache_data(show_spinner="Odczytywanie bazy wag...", max_entries=3)
 def cached_read_weights(file_bytes):
