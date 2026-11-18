@@ -94,13 +94,16 @@ def collect_draft(state, period_key):
         "settings": {key: float(state[key]) for key in SCALARS if key in state},
         "excluded_client_categories": list(state.get("excluded_client_categories", [])),
         "bonus_inputs": bonus_inputs,
+        "bonus_inputs_confirmed": bool(bonus_inputs is not None and
+            state.get("_bonus_inputs_confirmed_by_period", {}).get(period_key) is True),
     }
     validate_payload(snapshot)
     return snapshot
 
 
 def validate_payload(payload):
-    if not isinstance(payload, dict) or set(payload) != PAYLOAD_KEYS:
+    if (not isinstance(payload, dict) or
+            set(payload) not in (PAYLOAD_KEYS, PAYLOAD_KEYS | {"bonus_inputs_confirmed"})):
         raise DraftError("Nieznana struktura danych wersji roboczej.")
     if payload["version"] != 1:
         raise DraftError("Nieobsługiwany format wersji roboczej.")
@@ -128,6 +131,9 @@ def validate_payload(payload):
     ):
         raise DraftError("Nieprawidłowa lista wykluczeń.")
     bonus = payload["bonus_inputs"]
+    confirmed = payload.get("bonus_inputs_confirmed", False)
+    if type(confirmed) is not bool or (confirmed and bonus is None):
+        raise DraftError("Nieprawidłowy status zatwierdzenia dodatków.")
     if bonus is not None:
         if not isinstance(bonus, dict) or set(bonus) != {
             "forklift", "specials", "pallets", "selected"
@@ -187,6 +193,9 @@ def apply_draft(state, payload, period_key):
         }
         state["forklift_hours_df"] = state["_bonus_inputs_by_period"][period_key]["forklift"].copy()
         state["special_bonuses_df"] = state["_bonus_inputs_by_period"][period_key]["specials"].copy()
+        state.setdefault("_bonus_inputs_confirmed_by_period", {})[period_key] = (
+            payload.get("bonus_inputs_confirmed") is True
+        )
     state.pop("_prepared_bonus_slip", None)
 
 
