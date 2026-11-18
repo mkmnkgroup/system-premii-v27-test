@@ -103,10 +103,17 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
     st.session_state.forklift_hours_df = saved["forklift"].copy()
     st.session_state.special_bonuses_df = saved["specials"].copy()
 
-    st.info(
-        "Uzupełnij wszystkie trzy części formularza. Zmiany nie są liczone "
-        "przy każdym wpisanym znaku — użyj przycisku **Zapisz i przelicz dodatki**."
-    )
+    if st.session_state.get("_bonus_inputs_confirmed_by_period", {}).get(period) is True:
+        st.success(
+            "Dodatki dla tego miesiąca zostały wprowadzone i zatwierdzone "
+            "w bieżącej sesji. Aby zachować je po wylogowaniu, zapisz również "
+            "„Wersję roboczą miesiąca” w Supabase."
+        )
+    else:
+        st.info(
+            "Uzupełnij wózek, palety i premie specjalne (także wartości zerowe). "
+            "Zatwierdź je przyciskiem **Zapisz i przelicz dodatki**."
+        )
     safe_key = _safe_period_id(period)
 
     people_df = employees_df[["OSOBA", "UPRAWNIENIA UDT"]].copy()
@@ -210,7 +217,7 @@ def render_bonus_inputs(employees_df, period, default_pallets, forklift_pool, pa
                 st.session_state.special_bonuses_df = specials.copy()
                 st.session_state.setdefault("_bonus_inputs_confirmed_by_period", {})[period] = True
                 st.session_state.pop("_prepared_bonus_slip", None)
-                st.toast("Dodatki zapisane i przeliczone.", icon="✅")
+                st.toast("Dodatki wprowadzone i przeliczone w bieżącej sesji.", icon="✅")
                 st.rerun()
 
     forklift_hours = float(
