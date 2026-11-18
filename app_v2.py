@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 from premium_theme import apply_theme
-from help_ui import help_icon, help_heading
+from help_ui import help_icon, help_heading, HELP_STYLE
 from workflow_help import MODULE_HELP
 from employee_excel import read_employees_excel, write_employees_excel
 from bonus_slip_pdf import generate_bonus_slip_pdf
@@ -33,6 +33,7 @@ if st.session_state.get("premium_ui_mode") not in ("Ciemny", "Jasny"):
   st.session_state.premium_ui_mode = "Jasny"
 
 apply_theme(st.session_state.premium_ui_mode)
+st.markdown(HELP_STYLE, unsafe_allow_html=True)
 
 # ==========================================
 # DANE PUBLICZNEGO PODGLĄDU — ODDZIELNIE DLA KAŻDEJ SESJI
