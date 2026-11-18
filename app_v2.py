@@ -744,18 +744,10 @@ with st.container(border=True):
 gen_month_idx = months_list.index(gen_month_name) + 1
 period_key = f"{gen_month_name} {gen_year}"
 
-with st.expander("📁 Dane źródłowe do rozliczenia · raport i katalog wag", expanded=False):
-  st.caption("Wgraj pliki przed naliczaniem premii. Po utracie sesji pliki trzeba wgrać ponownie.")
-  _report_col, _weights_col = st.columns(2)
-  with _report_col:
-    uploaded_month_file = st.file_uploader(
-        "Wgraj raport produkcji (Excel):", type=["xlsx", "xls"],
-    )
-  with _weights_col:
-    uploaded_weights_file = st.file_uploader(
-        "Aktualna baza wag (Excel .xlsx):", type=["xlsx"],
-        key="current_weights_file",
-    )
+# Import źródeł jest dostępny wyłącznie w module Rozliczenie premii.
+# W innych modułach odczytujemy tylko pliki zapamiętane dla wybranego okresu.
+from monthly_sources_ui import sources_for_period, render_monthly_sources
+uploaded_month_file, uploaded_weights_file = sources_for_period(st.session_state, period_key)
 client_categories_in_file = []
 
 # Initialize the first period before computing its readiness.
@@ -776,13 +768,15 @@ st.sidebar.markdown("**◈ System Premii 2.7**")
 st.sidebar.caption("TEST · tylko dane fikcyjne")
 st.sidebar.caption("ETAPY PRACY")
 from workflow_progress import workflow_steps, progress_html
-_process_steps = workflow_steps(
-    st.session_state,
-    year=gen_year, month=gen_month_idx, period_label=period_key,
-    schedule_loaded=_schedule_matches_period,
-    production_loaded=uploaded_month_file is not None,
-    weights_loaded=uploaded_weights_file is not None,
-)
+def _month_workflow_steps():
+  return workflow_steps(
+      st.session_state,
+      year=gen_year, month=gen_month_idx, period_label=period_key,
+      schedule_loaded=_schedule_matches_period,
+      production_loaded=uploaded_month_file is not None,
+      weights_loaded=uploaded_weights_file is not None,
+  )
+_process_steps = _month_workflow_steps()
 _sidebar_nav_labels = {"Pulpit": "Pulpit", "Ustawienia": "Ustawienia"}
 for _stage_number, _stage in enumerate(_process_steps, 1):
   _marker = "✓" if _stage["tone"] == "done" else "○"
@@ -795,9 +789,13 @@ selected_module = st.sidebar.radio(
     format_func=lambda name: _sidebar_nav_labels[name],
     key="erp_selected_module",
 )
-# Compact stage ribbon is visible above every module, not only on Pulpit.
-# A generated local schedule and imported Excel files are not marked as finalized.
-st.markdown(progress_html(_process_steps, period_key), unsafe_allow_html=True)
+# The stage ribbon stays above module content on every page. The uploader
+# is rendered only in settlement, after this placeholder, never in attendance.
+_progress_placeholder = st.empty()
+if selected_module == "Rozliczenie premii":
+  uploaded_month_file, uploaded_weights_file = render_monthly_sources(period_key)
+  _process_steps = _month_workflow_steps()
+_progress_placeholder.markdown(progress_html(_process_steps, period_key), unsafe_allow_html=True)
 
 # Test-only, owner-scoped monthly drafts. No source files or published awards.
 from test_draft_ui import render_draft_controls, autosave_draft
@@ -1244,7 +1242,7 @@ def _render_calculator_tab():
     cur_pcs, cur_lines, cur_weight, cur_pallets = 0.0, 0.0, 0.0, 0.0
     prod_df = pd.DataFrame()
     if uploaded_month_file is None:
-      st.info("Aby rozpocząć rozliczenie, otwórz powyżej „Dane źródłowe do rozliczenia” i wgraj raport produkcji. Dodatki można wcześniej przygotować w module Dodatki premiowe.")
+      st.info("Aby rozpocząć rozliczenie, rozwiń panel „Dane źródłowe do rozliczenia” w tej zakładce i wgraj raport produkcji oraz katalog wag. Dodatki przygotujesz w module Dodatki premiowe.")
       return
     if uploaded_month_file is not None:
       try:
@@ -2159,7 +2157,7 @@ if selected_module == "Ustawienia":
   saved_excluded = st.session_state.excluded_client_categories
   available_categories = sorted(set(client_categories_in_file) | set(saved_excluded))
   if not client_categories_in_file:
-    st.info("Wgraj plik produkcji w sekcji „Dane źródłowe do rozliczenia”, aby zobaczyć grupy klientów. "
+    st.info("Wgraj plik produkcji w module „Rozliczenie premii”, aby zobaczyć grupy klientów. "
             "Zapisane wykluczenia pozostają dostępne do edycji.")
   selected_excluded = st.multiselect(
       "Dodatkowe grupy wykluczone z premii i analiz:",
