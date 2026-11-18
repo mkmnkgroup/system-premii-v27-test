@@ -25,7 +25,7 @@ st.set_page_config(
 
 from premium_theme import apply_theme
 from help_ui import help_icon, help_heading, HELP_STYLE
-from workflow_help import MODULE_HELP
+from workflow_help import MODULE_HELP, BONUS_HELP
 from employee_excel import read_employees_excel, write_employees_excel
 from bonus_slip_pdf import generate_bonus_slip_pdf
 
@@ -1318,6 +1318,9 @@ if selected_module == "Dodatki premiowe":
   help_heading(
       "Dodatki do premii",
       MODULE_HELP["bonuses"]
+      + "\n\n### Wózek widłowy\n" + BONUS_HELP["forklift"]
+      + "\n\n### Palety\n" + BONUS_HELP["pallets"]
+      + "\n\n### Premie specjalne\n" + BONUS_HELP["specials"]
   )
   from bonus_input_form import render_bonus_inputs
   render_bonus_inputs(
