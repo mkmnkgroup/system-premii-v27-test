@@ -7,6 +7,8 @@ autosave pass runs after the active module rendered its edits.
 import time
 
 import streamlit as st
+from help_ui import help_icon
+from workflow_help import DRAFT_HELP
 
 from test_draft_persistence import (
     DraftError, DraftConflict, collect_draft, apply_draft, fingerprint,
@@ -53,8 +55,7 @@ def render_draft_controls(year, month, period_key):
             metadata[period] = {"error": True}
     meta = metadata[period]
     with st.expander("💾 Wersja robocza miesiąca", expanded=False):
-        st.caption("Przechowywana bezpiecznie dla tego konta i miesiąca. "
-                   "Bez raportów źródłowych i bez publikowania premii.")
+        help_icon(DRAFT_HELP)
         if meta.get("error"):
             st.error("Brak łączności z zapisem. Dane pozostają wyłącznie w tej karcie.")
             return
@@ -114,8 +115,7 @@ def render_draft_controls(year, month, period_key):
                 help="Co najmniej 15 s między zapisami, tylko przy zmianach "
                      "i przy kolejnym przeliczeniu strony.",
             )
-        st.caption("Po odświeżeniu strony może być potrzebne ponowne zalogowanie. "
-                   "Następnie użyj „Przywróć zapis z bazy”.")
+        # Instrukcja odzyskiwania pracy jest dostępna przez ⓘ na górze panelu.
 
 
 def autosave_draft(year, month, period_key):
