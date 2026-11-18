@@ -41,13 +41,17 @@ def _draft_status(year, month, stage):
 
 def _monthly_snapshot_status(uid, year, month):
     from test_draft_persistence import read_draft, DraftError
-    from app_auth import _config
+    # The auth UI's _config() intentionally calls st.stop() when Secrets are
+    # missing. A read-only status probe must never abort the whole workspace.
     try:
-        url, anon_key = _config()
+        url = str(st.secrets["TEST_SUPABASE_URL"]).rstrip("/")
+        anon_key = str(st.secrets["TEST_SUPABASE_ANON_KEY"])
+        if url != "https://bzpfukyugfuybqivjyoz.supabase.co" or not anon_key:
+            return "unknown"
         token = st.session_state["_test_auth_access_token"]
         period = f"{int(year):04d}-{int(month):02d}-01"
         saved = read_draft(url, anon_key, token, uid, period)
-    except (DraftError, ValueError, KeyError, TypeError):
+    except (DraftError, ValueError, KeyError, TypeError, FileNotFoundError):
         return "unknown"
     if not saved:
         return "missing"
