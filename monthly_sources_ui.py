@@ -6,6 +6,8 @@ premii'. No source files are written to Supabase or shared across users.
 import hashlib
 import io
 import streamlit as st
+from help_ui import help_icon
+from workflow_help import SOURCES_HELP
 
 
 def _key(period):
@@ -44,11 +46,8 @@ def record_source(state, period, kind, uploaded):
 def render_monthly_sources(period):
     """Show the two imports only in monthly settlement, never in attendance."""
     with st.expander("📁 Dane źródłowe do rozliczenia · raport i katalog wag", expanded=False):
-        st.caption(
-            f"Okres: {period}. Wgraj raport produkcji i aktualny katalog wag. "
-            "Pliki pozostają w tej sesji, nawet gdy zmienisz zakładkę; "
-            "po zamknięciu sesji trzeba je wgrać ponownie."
-        )
+        help_icon(SOURCES_HELP)
+        st.caption(f"Okres importu: {period}")
         report_col, weights_col = st.columns(2)
         with report_col:
             uploaded_report = st.file_uploader(
