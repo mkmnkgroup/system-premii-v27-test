@@ -97,6 +97,8 @@ def render_draft_controls(year, month, period_key):
                     updated_at=result.get("updated_at"), checked_at=time.monotonic(),
                     saved_hash=fingerprint(payload),
                 )
+                from workflow_status_sync import invalidate_remote_workflow_status
+                invalidate_remote_workflow_status(st.session_state, year, month)
                 st.toast("Zapisano wersję roboczą.", icon="✅")
                 st.rerun()
             except DraftConflict as exc:
@@ -141,6 +143,8 @@ def autosave_draft(year, month, period_key):
             updated_at=result.get("updated_at"),
             checked_at=time.monotonic(),
         )
+        from workflow_status_sync import invalidate_remote_workflow_status
+        invalidate_remote_workflow_status(st.session_state, year, month)
     except DraftConflict:
         meta["autowrite"] = False
         meta["error"] = True
