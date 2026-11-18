@@ -58,7 +58,24 @@ class LazyProductionLoadTests(unittest.TestCase):
                 self.assertEqual(list(app.exception), [], module)
                 self.assertEqual(calls, [], f"{module} should not parse production Excel")
 
-            # Only Settings needs distinct categories to configure exclusions.
+            # Settings cannot import source files, so it has no source
+            # categories until a report has been uploaded in settlement.
+            next(r for r in app.radio if r.label == "Moduł").set_value("Ustawienia").run()
+            self.assertEqual(list(app.exception), [])
+            self.assertEqual(calls, [])
+            self.assertFalse(any(
+                "TEST-NEW-CATEGORY-ONLY-NAVIGATION" in entry.options
+                for entry in app.multiselect
+            ))
+
+            # The report uploader appears only in settlement. Parsing is
+            # lazy, and missing weights simply pause bonus calculations.
+            next(r for r in app.radio if r.label == "Moduł").set_value("Rozliczenie premii").run()
+            self.assertEqual(list(app.exception), [])
+            self.assertEqual(len(calls), 1)
+
+            # Settings may reuse the cached month's report to offer optional
+            # exclusion categories, without exposing its upload widget.
             next(r for r in app.radio if r.label == "Moduł").set_value("Ustawienia").run()
             self.assertEqual(list(app.exception), [])
             self.assertEqual(len(calls), 1)
@@ -68,7 +85,7 @@ class LazyProductionLoadTests(unittest.TestCase):
             ]
             self.assertIn("TEST-NEW-CATEGORY-ONLY-NAVIGATION", category_options)
 
-            # Cached categories should not reparse the same uploaded bytes.
+            # Switching modules does not reparse the same imported bytes.
             next(r for r in app.radio if r.label == "Moduł").set_value("Pulpit").run()
             self.assertEqual(len(calls), 1)
             next(r for r in app.radio if r.label == "Moduł").set_value("Ustawienia").run()
