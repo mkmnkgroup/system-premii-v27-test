@@ -107,7 +107,7 @@ class SavedScheduleConflictTests(unittest.TestCase):
                 reads += 1
                 return True, {
                     "found": True,
-                    "revision": 4 if reads == 1 else 6,
+                    "revision": 4 if reads <= 2 else 6,
                     "payload": saved_payload(),
                 }
             if action == "write":
@@ -121,7 +121,7 @@ class SavedScheduleConflictTests(unittest.TestCase):
             self.button(app, "Tak, zastąp zapis w bazie").click()
             self.button(app, "💾 Zapisz aktualny harmonogram").click().run()
         self.assertEqual(list(app.exception), [])
-        self.assertEqual(reads, 2)
+        self.assertEqual(reads, 3)
         self.assertEqual(writes, [])
         self.assertEqual(app.session_state.current_schedule_df.iloc[0]["OSOBA"], WORKER)
 
