@@ -35,7 +35,7 @@ class AttendanceDraftTests(unittest.TestCase):
     def test_empty_times_are_unconfirmed_not_attendance(self):
         stats = attendance_summary(build_attendance_payload(self.schedule, 2026, 11))
         self.assertEqual(stats, {
-            "planned": 2, "confirmed": 0, "absent_entries": 1, "unconfirmed": 1,
+            "planned": 2, "confirmed": 0, "assumed": 0, "absent_entries": 1, "unconfirmed": 1,
         })
 
     def test_restoring_keeps_actual_hours_and_absences(self):
