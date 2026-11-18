@@ -9,9 +9,11 @@ import re
 
 import pandas as pd
 import streamlit as st
+from help_ui import help_heading
 
 from test_schedule_drafts import _request, _slot, draft_item_key, safe_period
 from planned_attendance import BASIS_COLUMN, PLANNED_BASIS, MANUAL_BASIS
+from workflow_help import ATTENDANCE_DRAFT_HELP
 
 
 ATTENDANCE_FIELDS = (
@@ -212,11 +214,7 @@ def restore_attendance_payload(schedule, payload, year, month):
 def render_attendance_draft(year, month, display_period):
     """Explicit versioned attendance save/restore; no employee publication."""
     st.divider()
-    st.markdown("#### Ewidencja obecności · Trwały szkic Supabase TEST")
-    st.caption(
-        "Zapisuj faktyczne wejścia, wyjścia, nieobecności i nadgodziny. "
-        "Puste godziny pozostają niepotwierdzone. Ten zapis NIE publikuje danych pracownikom."
-    )
+    help_heading("Ewidencja obecności · Trwały szkic Supabase TEST", ATTENDANCE_DRAFT_HELP)
     if st.session_state.get("schedule_period_key") != display_period:
         st.warning("Najpierw wybierz i przywróć harmonogram właściwego miesiąca.")
         return
@@ -234,7 +232,7 @@ def render_attendance_draft(year, month, display_period):
     c.metric("Zgodnie z planem", stats["assumed"])
     d.metric("Nieobecności", stats["absent_entries"])
     e.metric("Niepotwierdzone dni", stats["unconfirmed"])
-    st.caption("Po imporcie nieobecności użyj „Uzupełnij planowane godziny”, aby nanieść je do tabeli przed zapisem.")
+    # Procedura importu i weryfikacji znajduje się pod ikoną ⓘ obok nagłówka.
 
     key = draft_item_key(year, month, "attendance")
     slot = _slot(key)
